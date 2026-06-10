@@ -1,16 +1,30 @@
-# React + Vite
+# 🏥 Nurse Scheduling MVP (ระบบจัดเวรพยาบาลอัจฉริยะ)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+ระบบเว็บแอปพลิเคชันต้นแบบสำหรับช่วยจัดตารางเวรพยาบาลรายเดือนอัตโนมัติ โดยคำนึงถึงเงื่อนไข ข้อจำกัด และโควตาเวรต่าง ๆ เพื่อความสะดวกรวดเร็วในการทำงานของหัวหน้าตึกพยาบาล
 
-Currently, two official plugins are available:
+## ✨ ฟีเจอร์หลัก (Key Features)
+- **จัดการข้อมูลเจ้าหน้าที่ (Staff Management):** เพิ่ม แก้ไข ลบ รายชื่อและข้อมูลพยาบาลในตึก
+- **ตั้งค่าประเภทเวร (Shift Types):** กำหนดช่วงเวลาเวร เช่น เวรเช้า, เวรบ่าย, เวรดึก, และวันหยุด
+- **ระบบจัดเวรด้วย AI (AI Auto-Scheduling):** คำนวณจัดเวรรายเดือนอัตโนมัติตามกฎเกณฑ์พื้นฐาน
+- **ปฏิทินตารางเวร (Monthly Roster View):** แสดงตารางเวรรายเดือนและสถิติเวรของพยาบาลแต่ละคน
+- **พิมพ์ตารางเวร (Print & Export):** จัดรูปแบบสวยงามสำหรับการสั่งพิมพ์ออกเป็นกระดาษหรือบันทึกเป็น PDF
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🚀 วิธีการติดตั้งและรันโปรเจกต์ (Getting Started)
 
-## React Compiler
+### 1. ติดตั้ง Library/Dependencies
+```bash
+npm install
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 2. รันระบบในโหมดพัฒนา (Development)
+```bash
+npm run dev
+```
 
-## Expanding the ESLint configuration
+### 3. บิลด์โปรเจกต์สำหรับใช้งานจริง (Production Build)
+```bash
+npm run build
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+---
+พัฒนาด้วย **React + Vite + Vanilla CSS**
