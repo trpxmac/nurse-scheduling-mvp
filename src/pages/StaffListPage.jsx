@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Users, Plus, Save, CheckCircle, Trash2, Search, UserPlus } from 'lucide-react';
-import { loadStaffList, saveStaffList, generateStaffId } from '../utils/storage';
+import { Users, Plus, Save, CheckCircle, Trash2, Search, UserPlus, X } from 'lucide-react';
+import { loadStaffList, saveStaffList, generateStaffId, loadShiftTypes } from '../utils/storage';
 import Modal from '../components/Modal';
 
-const POSITIONS = ['RN4', 'RN3', 'RN2', 'RN1', 'NA'];
+const POSITIONS = ['RN4', 'RN3', 'RN2', 'RN1', 'PN', 'PA', 'NA'];
+const LEVELS = ['RN4', 'RN3', 'RN2', 'RN1'];
 const EMPLOYMENT_TYPES = ['Full-time', 'Part-time'];
 
 export default function StaffListPage() {
@@ -13,14 +14,18 @@ export default function StaffListPage() {
   const [saved, setSaved] = useState(false);
   const [search, setSearch] = useState('');
   const [filterPos, setFilterPos] = useState('');
+  const [shiftTypes, setShiftTypes] = useState([]);
+  const [avoidStaffSearch, setAvoidStaffSearch] = useState('');
+  const [showAvoidStaffDropdown, setShowAvoidStaffDropdown] = useState(false);
   const [form, setForm] = useState({
     id: '', firstName: '', lastName: '', nickname: '',
     position: 'RN2', employmentType: 'Full-time',
-    preferred_shifts: '', restrictions: '', active: true,
+    avoid_staff: [], avoid_shifts: [], avoid_levels: [], active: true,
   });
 
   useEffect(() => {
     setStaffList(loadStaffList());
+    setShiftTypes(loadShiftTypes().filter(s => s.active && s.code !== 'OFF' && s.category !== 'LEAVE' && s.category !== 'OTHER'));
   }, []);
 
   const handleSave = () => {
@@ -33,21 +38,42 @@ export default function StaffListPage() {
     setForm({
       id: generateStaffId(), firstName: '', lastName: '', nickname: '',
       position: 'RN2', employmentType: 'Full-time',
-      preferred_shifts: '', restrictions: '', active: true,
+      avoid_staff: [], avoid_shifts: [], avoid_levels: [], active: true,
     });
+    setAvoidStaffSearch('');
+    setShowAvoidStaffDropdown(false);
     setEditIndex(-1);
     setShowModal(true);
   };
 
   const openEditModal = (index) => {
     const s = staffList[index];
-    setForm({ ...s });
+    setForm({ 
+      ...s, 
+      employmentType: s.employmentType || 'Full-time',
+      avoid_staff: s.avoid_staff || [], 
+      avoid_shifts: s.avoid_shifts || [],
+      avoid_levels: s.avoid_levels || [] 
+    });
+    setAvoidStaffSearch('');
+    setShowAvoidStaffDropdown(false);
     setEditIndex(index);
     setShowModal(true);
   };
 
   const handleFormChange = (field, value) => {
     setForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleCheckboxArrayChange = (field, itemValue, isChecked) => {
+    setForm(prev => {
+      const currentList = prev[field] || [];
+      if (isChecked) {
+        return { ...prev, [field]: [...currentList, itemValue] };
+      } else {
+        return { ...prev, [field]: currentList.filter(v => v !== itemValue) };
+      }
+    });
   };
 
   const handleSubmitForm = () => {
@@ -138,9 +164,9 @@ export default function StaffListPage() {
                 <th>ID</th>
                 <th>ชื่อ-นามสกุล</th>
                 <th>ชื่อเล่น</th>
-                <th>ตำแหน่ง</th>
+                <th>ระดับ/ตำแหน่ง</th>
                 <th>ประเภท</th>
-                <th>เวรที่ชอบ</th>
+                <th>ข้อจำกัด (Avoid)</th>
                 <th>สถานะ</th>
                 <th>จัดการ</th>
               </tr>
@@ -156,14 +182,29 @@ export default function StaffListPage() {
                     </td>
                     <td>{staff.nickname || '-'}</td>
                     <td>
-                      <span className="badge badge-info">{staff.position}</span>
+                      <span className="badge badge-info">{staff.level && staff.level !== '-' ? staff.level : staff.position}</span>
                     </td>
                     <td>
-                      <span className={`badge ${staff.employmentType === 'Full-time' ? 'badge-success' : 'badge-warning'}`}>
-                        {staff.employmentType}
+                      <span className={`badge ${(!staff.employmentType || staff.employmentType === 'Full-time') ? 'badge-success' : 'badge-warning'}`}>
+                        {staff.employmentType || 'Full-time'}
                       </span>
                     </td>
-                    <td className="text-sm text-muted">{staff.preferred_shifts || '-'}</td>
+                    <td className="text-sm">
+                      {((staff.avoid_shifts || []).length > 0 || (staff.avoid_staff || []).length > 0) ? (
+                        <div className="flex flex-col gap-xs">
+                          {(staff.avoid_shifts || []).length > 0 && (
+                            <span className="text-danger" style={{ fontSize: '0.75rem' }}>
+                              ❌ {staff.avoid_shifts.join(', ')}
+                            </span>
+                          )}
+                          {(staff.avoid_staff || []).length > 0 && (
+                            <span className="text-warning" style={{ fontSize: '0.75rem' }}>
+                              ⚠️ ไม่อยู่กับ {staff.avoid_staff.length} คน
+                            </span>
+                          )}
+                        </div>
+                      ) : '-'}
+                    </td>
                     <td>
                       <button
                         className="btn btn-ghost btn-sm"
@@ -282,23 +323,108 @@ export default function StaffListPage() {
           </div>
         </div>
         <div className="form-group">
-          <label className="form-label">เวรที่ชอบ (Preferred Shifts)</label>
-          <input
-            className="form-input"
-            type="text"
-            value={form.preferred_shifts}
-            onChange={(e) => handleFormChange('preferred_shifts', e.target.value)}
-            placeholder="เช่น M, E (คั่นด้วย comma)"
-          />
+          <label className="form-label text-danger">ไม่ขออยู่เวรนี้ (Avoid Shifts)</label>
+          <div className="flex gap-sm" style={{ flexWrap: 'wrap', marginTop: 4 }}>
+            {shiftTypes.map(shift => (
+              <label key={shift.code} className="flex items-center gap-xs" style={{ cursor: 'pointer', padding: '4px 8px', background: 'var(--color-bg-secondary)', borderRadius: 4 }}>
+                <input
+                  type="checkbox"
+                  checked={(form.avoid_shifts || []).includes(shift.code)}
+                  onChange={(e) => handleCheckboxArrayChange('avoid_shifts', shift.code, e.target.checked)}
+                />
+                <span className="text-sm">{shift.code} ({shift.name})</span>
+              </label>
+            ))}
+          </div>
         </div>
         <div className="form-group">
-          <label className="form-label">ข้อจำกัด (Restrictions)</label>
-          <textarea
-            className="form-textarea"
-            value={form.restrictions}
-            onChange={(e) => handleFormChange('restrictions', e.target.value)}
-            placeholder="เช่น ไม่สามารถอยู่เวรดึกได้"
-          />
+          <label className="form-label text-warning">ไม่ขออยู่กับบุคคลนี้ (Avoid Staff)</label>
+          <div className="multi-select-container" style={{ position: 'relative' }}>
+            
+            {/* Selected Tags */}
+            {(form.avoid_staff || []).length > 0 && (
+              <div className="flex gap-xs" style={{ flexWrap: 'wrap', marginBottom: 8 }}>
+                {(form.avoid_staff || []).map(staffId => {
+                  const s = staffList.find(x => x.id === staffId);
+                  const name = s ? `${s.firstName} ${s.lastName} (${s.position})` : staffId;
+                  return (
+                    <div key={staffId} className="badge badge-warning flex items-center gap-xs" style={{ padding: '4px 8px', fontSize: '0.75rem' }}>
+                      {name}
+                      <button 
+                        type="button" 
+                        onClick={() => handleCheckboxArrayChange('avoid_staff', staffId, false)}
+                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', color: 'inherit', opacity: 0.6 }}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Search Input */}
+            <div className="form-input flex items-center gap-xs" style={{ padding: '0 8px', borderColor: showAvoidStaffDropdown ? 'var(--color-primary-light)' : 'var(--border-color)' }}>
+              <Search size={16} className="text-muted" />
+              <input
+                type="text"
+                placeholder="ค้นหาชื่อพยาบาลเพื่อเพิ่ม..."
+                value={avoidStaffSearch}
+                onChange={(e) => {
+                  setAvoidStaffSearch(e.target.value);
+                  setShowAvoidStaffDropdown(true);
+                }}
+                onFocus={() => setShowAvoidStaffDropdown(true)}
+                style={{ border: 'none', background: 'transparent', width: '100%', height: '36px', outline: 'none', fontSize: '0.85rem' }}
+              />
+            </div>
+
+            {/* Dropdown */}
+            {showAvoidStaffDropdown && (
+              <>
+                <div 
+                  style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 90 }} 
+                  onClick={() => setShowAvoidStaffDropdown(false)} 
+                />
+                <div 
+                  className="dropdown-menu" 
+                  style={{ 
+                    position: 'absolute', top: '100%', left: 0, right: 0, 
+                    background: 'var(--color-bg-primary)', border: '1px solid var(--border-color)', 
+                    borderRadius: 6, marginTop: 4, maxHeight: 200, overflowY: 'auto', zIndex: 100,
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                  }}
+                >
+                  {staffList
+                    .filter(s => s.id !== form.id && s.active)
+                    .filter(s => !(form.avoid_staff || []).includes(s.id))
+                    .filter(s => 
+                      s.firstName.toLowerCase().includes(avoidStaffSearch.toLowerCase()) || 
+                      s.lastName.toLowerCase().includes(avoidStaffSearch.toLowerCase()) || 
+                      (s.nickname || '').toLowerCase().includes(avoidStaffSearch.toLowerCase())
+                    )
+                    .map(s => (
+                      <div 
+                        key={s.id}
+                        style={{ padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border-color-light)', fontSize: '0.85rem' }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-bg-secondary)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                        onClick={() => {
+                          handleCheckboxArrayChange('avoid_staff', s.id, true);
+                          setAvoidStaffSearch('');
+                          setShowAvoidStaffDropdown(false);
+                        }}
+                      >
+                        {s.firstName} {s.lastName} <span className="text-muted">({s.position})</span>
+                      </div>
+                    ))}
+                  {staffList.filter(s => s.id !== form.id && s.active && !(form.avoid_staff || []).includes(s.id) && (s.firstName.toLowerCase().includes(avoidStaffSearch.toLowerCase()) || s.lastName.toLowerCase().includes(avoidStaffSearch.toLowerCase()))).length === 0 && (
+                    <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>ไม่พบรายชื่อที่ค้นหา</div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
         <div className="form-group">
           <div className="toggle-wrapper">

@@ -38,6 +38,9 @@ Content-Type: `application/json`
 | `position` | String | ❌ | ตำแหน่งการทำงาน (เช่น RN, PN, PA) |
 | `level` | String | ❌ | ระดับการทำงาน (เช่น RN1, RN2, RN3) |
 | `active` | Boolean | ❌ | สถานะการปฏิบัติงาน (true = ทำงานปกติ) |
+| `avoid_staff` | Array | ✅ | รายชื่อ ID พนักงานที่ไม่ต้องการอยู่เวรด้วย |
+| `avoid_levels` | Array | ✅ | ระดับพนักงานที่ไม่ต้องการอยู่เวรด้วย (เช่น RN1) |
+| `avoid_shifts` | Array | ✅ | ประเภทเวรที่ไม่ต้องการขึ้น (เช่น M, E) |
 
 ### 2. Shift Type (ประเภทเวร)
 จัดเก็บเป็น Array ของ Object ใน Key `nss_shift_types_{deptId}`
@@ -68,6 +71,7 @@ Content-Type: `application/json`
 | `max_daily_hours` | Number | ❌ | จำนวนชั่วโมงทำงานสูงสุดต่อวัน |
 | `max_consecutive_nights` | Number | ❌ | จำนวนคืนที่ขึ้นเวรดึกติดต่อกันได้สูงสุด |
 | `required_*_coverage` | Number | ❌ | ความต้องการบุคลากรในแต่ละเวร (เช่น required_M_coverage) |
+| `incompatible_levels` | Array | ✅ | กฎส่วนกลาง: รายการจับคู่ระดับที่ห้ามขึ้นเวรด้วยกัน (เช่น `["RN1-RN1"]`) |
 
 ### 4. Monthly Roster (ตารางเวร)
 จัดเก็บเป็น Object แบบ Nested ใน Key `nss_monthly_roster_{deptId}_{yearMonth}`

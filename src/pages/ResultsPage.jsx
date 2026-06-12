@@ -52,6 +52,7 @@ export default function ResultsPage() {
   }, [viewMonth]);
 
   const activeStaff = useMemo(() => staffList.filter(s => s.active), [staffList]);
+  const activeShifts = useMemo(() => shiftTypes.filter(s => s.active), [shiftTypes]);
   const shiftTypesMap = useMemo(() => buildShiftTypesMap(shiftTypes), [shiftTypes]);
   const daysInMonth = useMemo(() => getDaysInMonth(viewMonth), [viewMonth]);
   const days = useMemo(() => Array.from({ length: daysInMonth }, (_, i) => i + 1), [daysInMonth]);
@@ -125,6 +126,8 @@ export default function ResultsPage() {
       for (const day of Object.keys(sr)) {
         const { shift: code } = parseShift(sr[day]);
         if (code && code !== '') {
+          // Exclude OFF and Leave days from the pie chart
+          if (['OFF', 'AL', 'SL', 'TRN', 'MTG'].includes(code)) continue;
           counts[code] = (counts[code] || 0) + 1;
         }
       }
@@ -168,8 +171,41 @@ export default function ResultsPage() {
     }));
   }, [roster, activeStaff, shiftTypesMap, config, days]);
 
+  // Staff Shift Summary Data
+  const staffShiftSummary = useMemo(() => {
+    return activeStaff.map(s => {
+      const counts = {};
+      let totalHours = 0;
+      let totalShiftHours = 0;
+      let totalOTHours = 0;
+      let totalWorkingShifts = 0;
+      
+      activeShifts.forEach(st => counts[st.code] = 0);
+      
+      const sr = roster[s.id] || {};
+      for (const day of Object.keys(sr)) {
+        const { shift, ot } = parseShift(sr[day]);
+        if (!shift) continue;
+        
+        if (counts[shift] !== undefined) {
+          counts[shift]++;
+        } else {
+          counts[shift] = 1;
+        }
+        
+        const stHours = getShiftHours(shift, shiftTypesMap);
+        totalShiftHours += stHours;
+        totalOTHours += ot;
+        totalHours += stHours + ot;
+        if (stHours > 0) totalWorkingShifts++;
+      }
+      return { staff: s, counts, totalHours, totalShiftHours, totalOTHours, totalWorkingShifts };
+    });
+  }, [roster, activeStaff, shiftTypesMap, activeShifts]);
+
   const tabs = [
     { id: 'dashboard', label: '📊 Dashboard' },
+    { id: 'staff-summary', label: '👥 สรุปเวรรายบุคคล' },
     { id: 'validation', label: '🚨 Validation Check' },
     { id: 'weekly', label: '📋 Weekly Summary' },
     { id: 'coverage', label: '🏥 Daily Coverage' },
@@ -292,6 +328,74 @@ export default function ResultsPage() {
                 <div className="empty-state"><p>ยังไม่มีข้อมูล</p></div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Staff Summary Tab */}
+      {activeTab === 'staff-summary' && (
+        <div className="card animate-fade-in">
+          <div className="card-header">
+            <div className="card-title">👥 สรุปจำนวนเวรรายบุคคล</div>
+            <span className="text-muted text-sm">ช่วยให้คุณสามารถตรวจสอบและกระจายเวรได้อย่างเป็นธรรม</span>
+          </div>
+          <div className="table-container">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>ชื่อ</th>
+                  <th>ตำแหน่ง</th>
+                  {activeShifts.map(st => (
+                    <th key={st.code} style={{ textAlign: 'center' }}>
+                      <ShiftBadge code={st.code} />
+                    </th>
+                  ))}
+                  <th style={{ borderLeft: '1px solid var(--border-color)', textAlign: 'center' }}>รวมเวรทำงาน (วัน)</th>
+                  <th style={{ textAlign: 'center' }}>ชม. ปกติ</th>
+                  <th style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>ชม. OT</th>
+                  <th style={{ textAlign: 'center' }}>รวมทั้งหมด (ชม.)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {staffShiftSummary.map(row => (
+                  <tr key={row.staff.id}>
+                    <td style={{ fontWeight: 600 }}>{row.staff.nickname || row.staff.firstName}</td>
+                    <td><span className="badge badge-info">{row.staff.position}</span></td>
+                    {activeShifts.map(st => (
+                      <td 
+                        key={st.code} 
+                        style={{ 
+                          textAlign: 'center', 
+                          fontWeight: row.counts[st.code] > 0 ? 700 : 400,
+                          color: row.counts[st.code] > 0 ? 'var(--color-text-primary)' : 'var(--border-color-strong)' 
+                        }}
+                      >
+                        {row.counts[st.code] || 0}
+                      </td>
+                    ))}
+                    <td style={{ textAlign: 'center', fontWeight: 600, borderLeft: '1px solid var(--border-color)' }}>
+                      {row.totalWorkingShifts}
+                    </td>
+                    <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--color-primary-dark)' }}>
+                      {row.totalShiftHours}
+                    </td>
+                    <td style={{ textAlign: 'center', fontWeight: 600, color: '#9ca3af' }}>
+                      {row.totalOTHours}
+                    </td>
+                    <td style={{ textAlign: 'center', fontWeight: 700 }}>
+                      {row.totalHours}
+                    </td>
+                  </tr>
+                ))}
+                {staffShiftSummary.length === 0 && (
+                  <tr>
+                    <td colSpan={activeShifts.length + 6} className="text-center text-muted" style={{ padding: 40 }}>
+                      ยังไม่มีข้อมูลบุคลากร
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

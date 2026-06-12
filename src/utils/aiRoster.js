@@ -6,7 +6,8 @@
 import { getShiftHours, detectQuickReturns, buildShiftTypesMap } from './scheduling';
 
 export function isSenior(staff) {
-  return staff.position === 'RN' && ['RN2', 'RN3', 'RN4', 'RN5'].includes(staff.level);
+  const lvl = staff.level || staff.position;
+  return ['RN2', 'RN3', 'RN4', 'RN5'].includes(lvl);
 }
 
 /**
@@ -180,6 +181,36 @@ function findBestStaff(pool, roster, shiftCode, day, shiftTypesMap, config, days
 function isAssignmentValid(roster, staff, day, shiftCode, shiftTypesMap, config, assignedStaffThisShift = []) {
   const staffId = staff.id;
   const staffRoster = roster[staffId];
+
+  // Check Avoid Shifts constraint
+  if (staff.avoid_shifts && staff.avoid_shifts.includes(shiftCode)) {
+    return false;
+  }
+
+  // Check Avoid Staff constraint
+  if (assignedStaffThisShift.length > 0) {
+    const conflictsWithAssigned = assignedStaffThisShift.some(
+      assignedStaff => 
+        (staff.avoid_staff && staff.avoid_staff.includes(assignedStaff.id)) || 
+        (assignedStaff.avoid_staff && assignedStaff.avoid_staff.includes(staff.id))
+    );
+    if (conflictsWithAssigned) return false;
+  }
+
+  // Check Avoid Levels constraint (Individual) has been removed because it is superseded by Global Incompatible Levels.
+
+  // Check Global Incompatible Levels constraint
+  if (config.incompatible_levels && config.incompatible_levels.length > 0 && assignedStaffThisShift.length > 0) {
+    const myLvl = staff.level || staff.position;
+    const violatesGlobalRule = assignedStaffThisShift.some(assignedStaff => {
+      const theirLvl = assignedStaff.level || assignedStaff.position;
+      const pair1 = `${myLvl}-${theirLvl}`;
+      const pair2 = `${theirLvl}-${myLvl}`;
+      return config.incompatible_levels.includes(pair1) || config.incompatible_levels.includes(pair2);
+    });
+    if (violatesGlobalRule) return false;
+  }
+
 
   // Check previous day for Quick Return
   if (day > 1) {

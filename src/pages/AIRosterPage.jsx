@@ -88,7 +88,7 @@ export default function AIRosterPage() {
       <div className="animate-fade-in">
         <div className="page-header">
           <div className="page-header-left">
-            <h1>🤖 AI จัดเวรอัตโนมัติ</h1>
+            <h1>⚡ จัดเวรอัตโนมัติ</h1>
           </div>
         </div>
         <div className="card">
@@ -106,7 +106,7 @@ export default function AIRosterPage() {
     <div className="animate-fade-in">
       <div className="page-header">
         <div className="page-header-left">
-          <h1>🤖 AI จัดเวรอัตโนมัติ</h1>
+          <h1>⚡ จัดเวรอัตโนมัติ</h1>
           <p>{getMonthName(viewMonth)} — {config.unit_name || config.hospital_name}</p>
         </div>
         <div className="page-header-actions">
@@ -151,7 +151,7 @@ export default function AIRosterPage() {
             <Sparkles size={64} style={{ color: 'var(--color-accent)', opacity: 0.6 }} />
             <h3 style={{ marginTop: 16 }}>พร้อมสร้างตารางเวรอัตโนมัติ</h3>
             <p style={{ maxWidth: 400 }}>
-              AI จะพิจารณาชั่วโมงทำงาน, ชั่วโมงพัก, Coverage ขั้นต่ำ
+              ระบบจะพิจารณาชั่วโมงทำงาน, ชั่วโมงพัก, Coverage ขั้นต่ำ
               และกระจายเวรอย่างเท่าเทียม
             </p>
             <button className="btn btn-accent btn-lg mt-lg" onClick={handleGenerate}>
@@ -170,7 +170,7 @@ export default function AIRosterPage() {
               animation: 'spin 1s linear infinite',
             }} />
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-            <h3 style={{ marginTop: 16 }}>🤖 AI กำลังจัดตารางเวร...</h3>
+            <h3 style={{ marginTop: 16 }}>⚡ กำลังคำนวณและจัดตารางเวร...</h3>
             <p>พิจารณาเงื่อนไขทั้งหมดเพื่อสร้างตารางเวรที่ดีที่สุด</p>
           </div>
         </div>
@@ -185,7 +185,7 @@ export default function AIRosterPage() {
                 {result.score}
               </div>
               <div className="ai-score-label">
-                AI Score — {getScoreLabel(result.score)}
+                ความสมบูรณ์ของตาราง — {getScoreLabel(result.score)}
               </div>
             </div>
           </div>
@@ -202,7 +202,7 @@ export default function AIRosterPage() {
           <div className="card" style={{ padding: 'var(--space-sm)' }}>
             <div className="card-header" style={{ padding: 'var(--space-sm) var(--space-md)' }}>
               <div className="card-title">
-                <Sparkles size={18} /> ตารางเวรที่ AI สร้าง
+                <Sparkles size={18} /> ตารางเวรที่ระบบสร้าง
               </div>
               <div className="flex gap-sm">
                 <button className="btn btn-ghost btn-sm" onClick={handleGenerate}>
@@ -222,7 +222,7 @@ export default function AIRosterPage() {
                       <th
                         key={d}
                         style={{
-                          background: isWeekend(viewMonth, d) ? 'rgba(245,158,11,0.08)' : undefined,
+                          background: isWeekend(viewMonth, d) ? '#fef3c7' : undefined,
                           minWidth: 44,
                         }}
                       >
@@ -242,8 +242,8 @@ export default function AIRosterPage() {
                     return (
                       <tr key={staff.id}>
                         <td className="staff-name-cell">
-                          <div style={{ fontWeight: 600, fontSize: '0.78rem' }}>{staff.nickname || staff.firstName}</div>
-                          <div style={{ fontSize: '0.62rem', color: 'var(--color-text-muted)' }}>{staff.position}</div>
+                          <div style={{ fontWeight: 600, fontSize: '0.78rem' }}>{staff.firstName} {staff.nickname ? `(${staff.nickname})` : ''}</div>
+                          <div style={{ fontSize: '0.62rem', color: 'var(--color-text-muted)', fontWeight: 700 }}>{staff.level && staff.level !== '-' ? staff.level : staff.position}</div>
                         </td>
                         {days.map(d => (
                           <td key={d} style={{

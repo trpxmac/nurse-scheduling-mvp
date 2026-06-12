@@ -7,9 +7,16 @@
  * Returns { shift: string, ot: number }
  */
 export function parseShift(cell) {
-  if (!cell) return { shift: '', ot: 0 };
-  if (typeof cell === 'string') return { shift: cell, ot: 0 };
-  return { shift: cell.shift || '', ot: Number(cell.ot) || 0 };
+  if (!cell) return { shift: '', ot: 0, otType: '' };
+  if (typeof cell === 'string') {
+    const parts = cell.split('\n');
+    return {
+      shift: parts[0] || '',
+      ot: parts.length > 1 ? Number(parts[1]) || 0 : 0,
+      otType: parts.length > 2 ? parts[2] : ''
+    };
+  }
+  return { shift: cell.shift || '', ot: Number(cell.ot) || 0, otType: cell.otType || '' };
 }
 
 /**

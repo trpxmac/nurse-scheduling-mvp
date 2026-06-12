@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, Fragment } from 'react';
+import { Printer, ArrowLeft } from 'lucide-react';
 import {
   loadConfig, loadShiftTypes, loadStaffList, loadMonthlyRoster,
   getDaysInMonth, getMonthName, getDayOfWeek, isWeekend
@@ -9,18 +10,35 @@ import './PrintPage.css';
 export default function PrintPage() {
   const [config, setConfig] = useState({});
   const [shiftTypes, setShiftTypes] = useState([]);
+  const activeShiftTypes = useMemo(() => shiftTypes.filter(s => s.active), [shiftTypes]);
   const [staffList, setStaffList] = useState([]);
   const [roster, setRoster] = useState({});
 
   useEffect(() => {
-    const loadedConfig = loadConfig();
-    setConfig(loadedConfig);
-    setShiftTypes(loadShiftTypes());
-    setStaffList(loadStaffList());
-    setRoster(loadMonthlyRoster(loadedConfig.month));
+    // Add gray body background class on mount, remove on unmount
+    document.body.style.backgroundColor = '#f3f4f6';
+    return () => { document.body.style.backgroundColor = ''; }
+  }, []);
+
+  useEffect(() => {
+    const loadAllData = () => {
+      const currentConfig = loadConfig();
+      setConfig(currentConfig);
+      setShiftTypes(loadShiftTypes());
+      const allStaff = loadStaffList();
+      setStaffList(allStaff);
+      setRoster(loadMonthlyRoster(currentConfig.month));
+    };
+
+    loadAllData();
+
+    // Auto-reload when returning to this tab
+    window.addEventListener('focus', loadAllData);
+    return () => window.removeEventListener('focus', loadAllData);
   }, []);
 
   const activeStaff = useMemo(() => staffList.filter(s => s.active), [staffList]);
+
   const shiftTypesMap = useMemo(() => buildShiftTypesMap(shiftTypes), [shiftTypes]);
   const daysInMonth = useMemo(() => getDaysInMonth(config.month), [config.month]);
   const days = useMemo(() => Array.from({ length: daysInMonth }, (_, i) => i + 1), [daysInMonth]);
@@ -28,16 +46,28 @@ export default function PrintPage() {
   if (activeStaff.length === 0) return <div>กำลังโหลดข้อมูล...</div>;
 
   return (
-    <div className="print-page-container">
-      <div className="no-print" style={{ textAlign: 'right', marginBottom: '20px' }}>
-        <button className="btn btn-primary" onClick={() => window.print()}>🖨️ สั่งพิมพ์ (Print)</button>
-        <p style={{ fontSize: '12px', marginTop: '8px', color: '#666' }}>
-          * ตรวจสอบให้แน่ใจว่าตั้งค่าในหน้าต่าง Print เป็น <strong>Landscape (แนวนอน)</strong> และ <strong>A4</strong>
-        </p>
+    <>
+      <div className="print-header-bar no-print">
+        <div className="print-header-title">
+          <button className="btn btn-ghost btn-sm" onClick={() => window.close()} style={{ marginRight: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <ArrowLeft size={16} /> ปิดหน้านี้
+          </button>
+          <span>โหมดตัวอย่างก่อนพิมพ์ (Print Preview)</span>
+        </div>
+        <div className="print-header-actions">
+          <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>
+            * แนะนำให้ตั้งค่าเป็น <strong>Landscape (แนวนอน)</strong> และ <strong>A4</strong>
+          </p>
+          <button className="btn btn-primary" onClick={() => window.print()} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Printer size={16} /> สั่งพิมพ์ (Print)
+          </button>
+        </div>
       </div>
 
-      {/* Main Roster Table */}
-      <table className="print-table">
+      <div className="print-preview-wrapper">
+        <div className="print-page-container">
+          {/* Main Roster Table */}
+          <table className="print-table">
         <thead>
           {/* Dummy row to hold the page header so it repeats on every printed page */}
           <tr>
@@ -49,15 +79,13 @@ export default function PrintPage() {
                 <div className="print-title-container">
                   <h2>ตารางเวรปฏิบัติงานแผนก ........... {config.unit_name} ...........</h2>
                   <div className="print-subtitle">
-                    เดือน ........ {getMonthName(config.month)} ........ Roster ..... {activeStaff.length} ..... คน (Hours=...{config.max_daily_hours}.. ชม.)
+                    เดือน ........ {getMonthName(config.month)} ........ Roster ..... {config.roster_hours || '...............'} ..... ชม. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (Holiday ..... {config.holiday_hours || '...............'} ..... ชม.)
                   </div>
                 </div>
               </div>
             </td>
           </tr>
           <tr>
-            <th rowSpan={2} className="col-no">ลำดับ</th>
-            <th rowSpan={2} className="col-empid">รหัสพนักงาน</th>
             <th rowSpan={2} className="col-name">ชื่อ-สกุล</th>
             <th rowSpan={2} className="col-position">ตำแหน่ง<br/>/Level</th>
             <th className="col-day-label">วันที่</th>
@@ -71,30 +99,33 @@ export default function PrintPage() {
             {days.map(d => <th key={`dow-${d}`} className="col-dow">{getDayOfWeek(config.month, d)}</th>)}
           </tr>
         </thead>
-        <tbody>
+        <>
           {activeStaff.map((staff, i) => {
             const staffRoster = roster[staff.id] || {};
             let totalHours = 0;
             let totalOT = 0;
+            let totalRLV = 0;
+            let totalADM = 0;
 
             for (let d = 1; d <= daysInMonth; d++) {
-              const { shift, ot } = parseShift(staffRoster[d]);
+              const { shift, ot, otType } = parseShift(staffRoster[d]);
               const st = shiftTypesMap[shift];
               if (st) totalHours += st.hours;
-              totalOT += ot;
+              
+              if (otType === 'R') totalRLV += ot;
+              else if (otType === 'A') totalADM += ot;
+              else totalOT += ot;
             }
 
             return (
-              <Fragment key={staff.id}>
+              <tbody key={staff.id} style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
                 {/* Row 1: Shifts */}
                 <tr className="staff-row-shift">
-                  <td rowSpan={2} className="text-center">{i + 1}</td>
-                  <td rowSpan={2} className="text-center">{staff.employeeId || '-'}</td>
-                  <td rowSpan={2} className="staff-name-cell">
+                  <td rowSpan={2} className="staff-name-cell" style={{ whiteSpace: 'nowrap' }}>
                     {staff.firstName} {staff.lastName}
                   </td>
                   <td rowSpan={2} className="text-center">
-                    {staff.position}<br/>{staff.level || '-'}
+                    {(staff.level && staff.level !== '-') ? staff.level : staff.position}
                   </td>
                   <td className="text-center row-label">กะ</td>
                   {days.map(d => {
@@ -102,52 +133,59 @@ export default function PrintPage() {
                     return <td key={d} className="text-center cell-shift">{shift}</td>;
                   })}
                   <td rowSpan={2} className="text-center summary-val">{totalHours > 0 ? totalHours : ''}</td>
-                  <td rowSpan={2} className="text-center summary-val">{totalOT > 0 ? totalOT : ''}</td>
-                  <td rowSpan={2} className="remark-cell"></td>
+                  <td rowSpan={2} className="text-center summary-val" style={{ fontSize: '9px', lineHeight: '1.2' }}>
+                    {totalOT > 0 && <div>OT={totalOT}</div>}
+                    {totalRLV > 0 && <div>RLV={totalRLV}</div>}
+                    {totalADM > 0 && <div>ADM={totalADM}</div>}
+                  </td>
+                  <td rowSpan={2} className="remark-cell" style={{ textAlign: 'left', paddingLeft: '6px', verticalAlign: 'middle' }}>
+                    {i < activeShiftTypes.length ? (
+                      <span style={{ fontSize: '8.5px' }}>
+                        <strong>{activeShiftTypes[i].code}</strong> = {
+                          (activeShiftTypes[i].start && activeShiftTypes[i].end)
+                            ? `${activeShiftTypes[i].start}-${activeShiftTypes[i].end}`
+                            : activeShiftTypes[i].name.split(' (')[0]
+                        }
+                      </span>
+                    ) : ''}
+                  </td>
                 </tr>
                 {/* Row 2: OT */}
                 <tr className="staff-row-ot">
-                  <td className="text-center row-label">OT</td>
+                  <td className="text-center row-label" style={{ fontSize: '8.5px', padding: 2 }}>OT/RLV/ADM</td>
                   {days.map(d => {
-                    const { ot } = parseShift(staffRoster[d]);
-                    return <td key={`ot-${d}`} className="text-center cell-ot">{ot > 0 ? ot : ''}</td>;
+                    const { ot, otType } = parseShift(staffRoster[d]);
+                    return <td key={`ot-${d}`} className="text-center cell-ot">{ot > 0 ? `${ot}${otType || ''}` : ''}</td>;
                   })}
                 </tr>
-              </Fragment>
+              </tbody>
             );
           })}
-        </tbody>
+        </>
       </table>
 
-      {/* Footer / Legend / Signatures */}
+      {/* Footer / Signatures */}
       <div className="print-footer">
-        <div className="legend-section">
-          <div className="legend-grid">
-            {shiftTypes.filter(s => s.active).map(st => (
-              <div key={st.code} className="legend-item">
-                <strong>{st.code}</strong> = {st.name} ({st.hours} ชม.)
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="signature-section">
+        <div className="signature-section" style={{ width: '100%', justifyContent: 'flex-end', gap: '80px', paddingRight: '40px' }}>
           <div className="sig-box">
             <div className="sig-line"></div>
-            <div className="sig-name">(........................................................)</div>
-            <div className="sig-title">ผู้จัดทำตารางเวร</div>
-          </div>
-          <div className="sig-box">
-            <div className="sig-line"></div>
-            <div className="sig-name">(........................................................)</div>
+            <div className="sig-name">({config.head_nurse_name ? ` ${config.head_nurse_name} ` : '................................................'})</div>
             <div className="sig-title">หัวหน้าแผนก</div>
           </div>
           <div className="sig-box">
             <div className="sig-line"></div>
-            <div className="sig-name">(........................................................)</div>
-            <div className="sig-title">ผู้อำนวยการฝ่ายการพยาบาล<br/>Senior Nurse Manager</div>
+            <div className="sig-name">({config.manager_name ? ` ${config.manager_name} ` : '................................................'})</div>
+            <div className="sig-title">ผู้จัดการฝ่าย</div>
+          </div>
+          <div className="sig-box">
+            <div className="sig-line"></div>
+            <div className="sig-name">({config.director_name ? ` ${config.director_name} ` : '................................................'})</div>
+            <div className="sig-title">ผู้อำนวยการฝ่ายการพยาบาล</div>
           </div>
         </div>
       </div>
-    </div>
+        </div>
+      </div>
+    </>
   );
 }

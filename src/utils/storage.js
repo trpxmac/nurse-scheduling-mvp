@@ -21,9 +21,16 @@ const SCOPED_KEYS = {
 export const DEFAULT_CONFIG = {
   // Unit Info
   unit_name: 'Ward 6B+IMCU',
-  hospital_name: 'BPK',
+  hospital_name: 'BSI',
   month: new Date().toISOString().slice(0, 7), // YYYY-MM
   shift_mode: '12HR', // 8HR | 12HR | MIXED
+  roster_hours: '',
+  holiday_hours: '',
+
+  // Signatures
+  head_nurse_name: '',
+  manager_name: '',
+  director_name: '',
 
   // Working Rules
   max_weekly_hours: 52,
@@ -40,6 +47,9 @@ export const DEFAULT_CONFIG = {
   // Coverage Requirements — 12HR shifts (D, N12)
   required_D_coverage: 4,
   required_N12_coverage: 3,
+
+  // Pairing Rules
+  incompatible_levels: [], // e.g. ['RN1-RN1']
 };
 
 export const DEFAULT_SHIFT_TYPES = [

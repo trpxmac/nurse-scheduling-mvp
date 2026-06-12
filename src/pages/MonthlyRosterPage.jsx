@@ -8,6 +8,7 @@ import {
   loadActiveMonth, saveActiveMonth
 } from '../utils/storage';
 import MonthSelector from '../components/MonthSelector';
+import CustomDialog from '../components/CustomDialog';
 import {
   buildShiftTypesMap, calcMonthlyHours, detectQuickReturns,
   calcDailyCoverage, checkCoverageRequirements, parseShift,
@@ -21,6 +22,9 @@ export default function MonthlyRosterPage() {
   const [roster, setRoster] = useState({});
   const [saved, setSaved] = useState(false);
   const [viewMonth, setViewMonthState] = useState(loadActiveMonth());
+  const [dialog, setDialog] = useState({ isOpen: false, type: 'CONFIRM', title: '', message: '', onConfirm: null, danger: false });
+
+  const closeDialog = () => setDialog(prev => ({ ...prev, isOpen: false }));
 
   const setViewMonth = (m) => {
     setViewMonthState(m);
@@ -71,14 +75,15 @@ export default function MonthlyRosterPage() {
     return checkCoverageRequirements(coverage, config);
   }, [coverage, config]);
 
-  const handleShiftChange = (staffId, day, value) => {
-    setRoster(prev => ({
-      ...prev,
-      [staffId]: {
-        ...(prev[staffId] || {}),
-        [day]: value,
-      }
-    }));
+  const handleShiftChange = (staffId, day, { shift, ot, otType = '' }) => {
+    setRoster(prev => {
+      const staffRoster = prev[staffId] || {};
+      const val = `${shift}\n${ot}\n${otType}`;
+      return {
+        ...prev,
+        [staffId]: { ...staffRoster, [day]: val }
+      };
+    });
     setSaved(false);
   };
 
@@ -89,10 +94,19 @@ export default function MonthlyRosterPage() {
   };
 
   const handleClear = () => {
-    if (window.confirm('ล้างตารางเวรทั้งหมด?')) {
-      setRoster({});
-      saveMonthlyRoster({}, viewMonth);
-    }
+    setDialog({
+      isOpen: true,
+      type: 'CONFIRM',
+      title: 'ยืนยันการล้างตาราง',
+      message: 'คุณแน่ใจหรือไม่ว่าต้องการล้างตารางเวรทั้งหมดของเดือนนี้?\nการกระทำนี้ไม่สามารถย้อนกลับได้',
+      danger: true,
+      confirmText: 'ล้างข้อมูล',
+      onConfirm: () => {
+        setRoster({});
+        saveMonthlyRoster({}, viewMonth);
+        closeDialog();
+      }
+    });
   };
 
   const getShiftClass = (code) => {
@@ -150,6 +164,10 @@ export default function MonthlyRosterPage() {
               {st.code} ({st.hours > 0 ? `${st.start}-${st.end}` : 'หยุด'})
             </span>
           ))}
+          <span style={{ marginLeft: 'auto', borderLeft: '1px solid var(--border-color)', paddingLeft: 16 }}>
+            <span className="text-muted font-bold" style={{ fontSize: '0.75rem' }}>หมายเหตุ:</span>
+            <span className="text-muted" style={{ marginLeft: 4, fontSize: '0.75rem' }}>ช่อง OT สามารถพิมพ์ตัวอักษรต่อท้ายได้ เช่น <strong>8R</strong>=RLV, <strong>8A</strong>=ADM</span>
+          </span>
         </div>
       </div>
 
@@ -164,7 +182,7 @@ export default function MonthlyRosterPage() {
                   <th
                     key={d}
                     style={{
-                      background: isWeekend(viewMonth, d) ? 'rgba(245,158,11,0.08)' : undefined,
+                      background: isWeekend(viewMonth, d) ? '#fef3c7' : undefined,
                       minWidth: 54,
                     }}
                   >
@@ -194,8 +212,8 @@ export default function MonthlyRosterPage() {
                 return (
                   <tr key={staff.id}>
                     <td className="staff-name-cell" title={`${staff.firstName} ${staff.lastName}`}>
-                      <div style={{ fontWeight: 600, fontSize: '0.78rem' }}>{staff.nickname || staff.firstName}</div>
-                      <div style={{ fontSize: '0.62rem', color: 'var(--color-text-muted)' }}>{staff.position}</div>
+                          <div style={{ fontWeight: 600, fontSize: '0.78rem' }}>{staff.firstName} {staff.nickname ? `(${staff.nickname})` : ''}</div>
+                          <div style={{ fontSize: '0.62rem', color: 'var(--color-text-muted)', fontWeight: 700 }}>{staff.level && staff.level !== '-' ? staff.level : staff.position}</div>
                     </td>
                     {days.map(d => (
                       <td
@@ -203,18 +221,16 @@ export default function MonthlyRosterPage() {
                         className={staffViolations.has(d) ? 'violation-cell' : ''}
                         style={{
                           background: isWeekend(viewMonth, d) ? 'rgba(245,158,11,0.04)' : undefined,
-                          padding: 2,
                         }}
                       >
                         {(() => {
-                          const { shift, ot } = parseShift(staffRoster[d]);
+                          const { shift, ot, otType } = parseShift(staffRoster[d]);
                           return (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                               <select
                                 className={`roster-cell-select ${getShiftClass(shift)}`}
                                 value={shift}
-                                onChange={(e) => handleShiftChange(staff.id, d, { shift: e.target.value, ot })}
-                                style={{ height: '24px', padding: '0 2px' }}
+                                onChange={(e) => handleShiftChange(staff.id, d, { shift: e.target.value, ot, otType })}
                               >
                                 <option value="">-</option>
                                 {activeShifts.map(st => (
@@ -222,17 +238,25 @@ export default function MonthlyRosterPage() {
                                 ))}
                               </select>
                               <input 
-                                type="number" 
-                                min="0" max="24"
-                                value={ot || ''}
-                                placeholder="OT"
-                                onChange={(e) => handleShiftChange(staff.id, d, { shift, ot: Number(e.target.value) || 0 })}
-                                style={{ 
-                                  width: '100%', height: '18px', fontSize: '0.65rem', 
-                                  textAlign: 'center', background: 'transparent', border: '1px dashed var(--border-color)',
-                                  color: 'var(--color-text-secondary)', borderRadius: '3px'
+                                type="text" 
+                                className="ot-input"
+                                value={ot > 0 ? `${ot}${otType || ''}` : ''}
+                                placeholder="ชม."
+                                onChange={(e) => {
+                                  const val = e.target.value.toUpperCase();
+                                  const match = val.match(/^(\d*)([A-Z]*)$/);
+                                  let newOt = 0;
+                                  let newOtType = '';
+                                  if (match) {
+                                    newOt = Number(match[1]) || 0;
+                                    newOtType = match[2];
+                                  } else {
+                                    newOt = parseInt(val, 10) || 0;
+                                    newOtType = val.replace(/[0-9]/g, '');
+                                  }
+                                  handleShiftChange(staff.id, d, { shift, ot: newOt, otType: newOtType });
                                 }}
-                                title="ชั่วโมง OT"
+                                title="จำนวน ชม. OT/RLV/ADM (เช่น 8, 8R, 8A)"
                               />
                             </div>
                           );
@@ -277,6 +301,17 @@ export default function MonthlyRosterPage() {
           </table>
         </div>
       </div>
+
+      <CustomDialog
+        isOpen={dialog.isOpen}
+        onClose={closeDialog}
+        type={dialog.type}
+        title={dialog.title}
+        message={dialog.message}
+        onConfirm={dialog.onConfirm}
+        danger={dialog.danger}
+        confirmText={dialog.confirmText}
+      />
     </div>
   );
 }
