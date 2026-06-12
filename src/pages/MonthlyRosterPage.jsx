@@ -5,7 +5,9 @@ import {
   loadConfig, loadShiftTypes, loadStaffList,
   loadMonthlyRoster, saveMonthlyRoster,
   getDaysInMonth, getDayOfWeek, isWeekend, getMonthName,
+  loadActiveMonth, saveActiveMonth
 } from '../utils/storage';
+import MonthSelector from '../components/MonthSelector';
 import {
   buildShiftTypesMap, calcMonthlyHours, detectQuickReturns,
   calcDailyCoverage, checkCoverageRequirements, parseShift,
@@ -18,26 +20,42 @@ export default function MonthlyRosterPage() {
   const [staffList, setStaffList] = useState([]);
   const [roster, setRoster] = useState({});
   const [saved, setSaved] = useState(false);
+  const [viewMonth, setViewMonthState] = useState(loadActiveMonth());
+
+  const setViewMonth = (m) => {
+    setViewMonthState(m);
+    saveActiveMonth(m);
+  };
 
   useEffect(() => {
     const loadedConfig = loadConfig();
     setConfig(loadedConfig);
     setShiftTypes(loadShiftTypes());
     setStaffList(loadStaffList());
-    setRoster(loadMonthlyRoster(loadedConfig.month));
+    const month = loadActiveMonth();
+    setViewMonth(month);
+    setRoster(loadMonthlyRoster(month));
   }, []);
+
+  // Reload roster when viewMonth changes
+  useEffect(() => {
+    if (viewMonth) {
+      setRoster(loadMonthlyRoster(viewMonth));
+      setSaved(false);
+    }
+  }, [viewMonth]);
 
   const activeStaff = useMemo(() => staffList.filter(s => s.active), [staffList]);
   const activeShifts = useMemo(() => shiftTypes.filter(s => s.active), [shiftTypes]);
   const shiftTypesMap = useMemo(() => buildShiftTypesMap(shiftTypes), [shiftTypes]);
-  const daysInMonth = useMemo(() => getDaysInMonth(config.month), [config.month]);
+  const daysInMonth = useMemo(() => getDaysInMonth(viewMonth), [viewMonth]);
   const days = useMemo(() => Array.from({ length: daysInMonth }, (_, i) => i + 1), [daysInMonth]);
 
   // Calculate violations for each staff
   const violations = useMemo(() => {
     const v = {};
     for (const staff of activeStaff) {
-      const qr = detectQuickReturns(roster[staff.id] || {}, shiftTypesMap, config.min_rest_hours, config.month);
+      const qr = detectQuickReturns(roster[staff.id] || {}, shiftTypesMap, config.min_rest_hours, viewMonth);
       v[staff.id] = new Set(qr.map(viol => viol.day));
     }
     return v;
@@ -65,7 +83,7 @@ export default function MonthlyRosterPage() {
   };
 
   const handleSave = () => {
-    saveMonthlyRoster(roster, config.month);
+    saveMonthlyRoster(roster, viewMonth);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };
@@ -73,7 +91,7 @@ export default function MonthlyRosterPage() {
   const handleClear = () => {
     if (window.confirm('ล้างตารางเวรทั้งหมด?')) {
       setRoster({});
-      saveMonthlyRoster({}, config.month);
+      saveMonthlyRoster({}, viewMonth);
     }
   };
 
@@ -105,10 +123,11 @@ export default function MonthlyRosterPage() {
     <div className="animate-fade-in">
       <div className="page-header">
         <div className="page-header-left">
-          <h1>📅 จัดตารางเวร — {getMonthName(config.month)}</h1>
+          <h1>📅 จัดตารางเวร</h1>
           <p>{config.unit_name ? `${config.unit_name} — ` : ''}{config.hospital_name} | บุคลากร {activeStaff.length} คน | {daysInMonth} วัน</p>
         </div>
         <div className="page-header-actions">
+          <MonthSelector value={viewMonth} onChange={setViewMonth} />
           <Link to="/print" target="_blank" className="btn btn-ghost" style={{ border: '1px solid var(--border-color)' }}>
             <Printer size={16} /> สั่งพิมพ์ (Print)
           </Link>
@@ -145,13 +164,13 @@ export default function MonthlyRosterPage() {
                   <th
                     key={d}
                     style={{
-                      background: isWeekend(config.month, d) ? 'rgba(245,158,11,0.08)' : undefined,
+                      background: isWeekend(viewMonth, d) ? 'rgba(245,158,11,0.08)' : undefined,
                       minWidth: 54,
                     }}
                   >
                     <div>{d}</div>
-                    <div style={{ fontSize: '0.6rem', color: isWeekend(config.month, d) ? 'var(--color-accent)' : 'var(--color-text-muted)' }}>
-                      {getDayOfWeek(config.month, d)}
+                    <div style={{ fontSize: '0.6rem', color: isWeekend(viewMonth, d) ? 'var(--color-accent)' : 'var(--color-text-muted)' }}>
+                      {getDayOfWeek(viewMonth, d)}
                     </div>
                   </th>
                 ))}
@@ -183,7 +202,7 @@ export default function MonthlyRosterPage() {
                         key={d}
                         className={staffViolations.has(d) ? 'violation-cell' : ''}
                         style={{
-                          background: isWeekend(config.month, d) ? 'rgba(245,158,11,0.04)' : undefined,
+                          background: isWeekend(viewMonth, d) ? 'rgba(245,158,11,0.04)' : undefined,
                           padding: 2,
                         }}
                       >

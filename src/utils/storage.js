@@ -20,7 +20,7 @@ const SCOPED_KEYS = {
 
 export const DEFAULT_CONFIG = {
   // Unit Info
-  unit_name: 'Ward6B+IMCU',
+  unit_name: 'Ward 6B+IMCU',
   hospital_name: 'BPK',
   month: new Date().toISOString().slice(0, 7), // YYYY-MM
   shift_mode: '12HR', // 8HR | 12HR | MIXED
@@ -65,25 +65,33 @@ export const DEFAULT_SHIFT_TYPES = [
 ];
 
 export const MOCK_STAFF = [
-  { id: 'S1', employeeId: '670137', firstName: 'ปนัดดา', lastName: 'จิตต์เจริญ', nickname: 'ปนัดดา', position: 'RN', level: 'RN4', active: true },
-  { id: 'S2', employeeId: '609484', firstName: 'เขมจิรา', lastName: 'ศิริสุวรรณ', nickname: 'เขมจิรา', position: 'RN', level: 'RN2', active: true },
-  { id: 'S3', employeeId: '670319', firstName: 'กันยิกา', lastName: 'เรืองขจร', nickname: 'กันยิกา', position: 'Admin', level: '-', active: true },
+  // ── Senior RN (RN4, RN3, RN2) (9 คน) ──
+  { id: 'S01', employeeId: '1586347', firstName: 'ปนัดดา',   lastName: 'จิตต์เจริญ',     nickname: 'ดา',   position: 'RN', level: 'RN4', active: true },
+  { id: 'S02', employeeId: '622063',  firstName: 'เขมจิรา',   lastName: 'ศิริสุวรรณ',     nickname: 'จิรา', position: 'RN', level: 'RN4', active: true },
+  { id: 'S03', employeeId: '596823',  firstName: 'สุภาวดี',   lastName: 'ธนะพัฒน์',       nickname: 'ดี',   position: 'RN', level: 'RN3', active: true },
+  { id: 'S04', employeeId: '553005',  firstName: 'ศศิธร',     lastName: 'วงศ์สวัสดิ์',     nickname: 'ธร',   position: 'RN', level: 'RN3', active: true },
+  { id: 'S05', employeeId: '611077',  firstName: 'พิมพ์ผกา',  lastName: 'แก้วมณี',        nickname: 'กา',   position: 'RN', level: 'RN3', active: true },
+  { id: 'S06', employeeId: '630177',  firstName: 'จิราภรณ์',  lastName: 'สาระคุณ',        nickname: 'ภรณ์', position: 'RN', level: 'RN2', active: true },
+  { id: 'S07', employeeId: '635143',  firstName: 'อาทิตยา',   lastName: 'ชนะกุล',         nickname: 'ยา',   position: 'RN', level: 'RN2', active: true },
+  { id: 'S08', employeeId: '501694',  firstName: 'กฤษฎิ์ภูมิ', lastName: 'วรรณดี',         nickname: 'ภูมิ', position: 'RN', level: 'RN2', active: true },
+  { id: 'S09', employeeId: '628475',  firstName: 'วรัญญา',    lastName: 'รุ่งเรือง',       nickname: 'รัญ',  position: 'RN', level: 'RN2', active: true },
+
+  // ── Junior RN (RN1) (3 คน) ──
+  { id: 'S10', employeeId: '741258',  firstName: 'ณิชาภัทร',  lastName: 'ตั้งเจริญ',      nickname: 'ณิชา', position: 'RN', level: 'RN1', active: true },
+  { id: 'S11', employeeId: '752369',  firstName: 'พรนภา',    lastName: 'สุขสันต์',       nickname: 'พร',   position: 'RN', level: 'RN1', active: true },
+  { id: 'S12', employeeId: '763480',  firstName: 'กิตติศักดิ์', lastName: 'ใจตรง',         nickname: 'กิต',  position: 'RN', level: 'RN1', active: true },
+
+  // ── PN — Practical Nurses (3 คน) ──
+  { id: 'S13', employeeId: '710634',  firstName: 'กันยิกา',   lastName: 'เรืองขจร',       nickname: 'กัน',  position: 'PN', level: '-', active: true },
+  { id: 'S14', employeeId: '603484',  firstName: 'จุฑามาศ',   lastName: 'ทองใบ',          nickname: 'มาศ',  position: 'PN', level: '-', active: true },
+  { id: 'S15', employeeId: '600133',  firstName: 'วรรณภา',    lastName: 'สุขสมบูรณ์',     nickname: 'แอน',  position: 'PN', level: '-', active: true },
+
+  // ── PA — Patient Assistants (2 คน) ──
+  { id: 'S16', employeeId: '548201',  firstName: 'นภาพร',     lastName: 'พงษ์ประเสริฐ',   nickname: 'นภา',  position: 'PA', level: '-', active: true },
+  { id: 'S17', employeeId: '615892',  firstName: 'คำศรี',     lastName: 'บุญมาก',         nickname: 'ศรี',  position: 'PA', level: '-', active: true },
 ];
 
-export const MOCK_ROSTER = {
-  'S1': {
-    1: { shift: 'M', ot: 0 }, 2: { shift: 'M', ot: 0 }, 3: { shift: 'E', ot: 0 }, 4: { shift: 'OFF', ot: 0 }, 5: { shift: 'M', ot: 4 },
-    6: { shift: 'M', ot: 0 }, 7: { shift: 'N8', ot: 0 }, 8: { shift: 'N8', ot: 0 }, 9: { shift: 'OFF', ot: 0 }, 10: { shift: 'OFF', ot: 0 },
-  },
-  'S2': {
-    1: { shift: 'E', ot: 0 }, 2: { shift: 'E', ot: 0 }, 3: { shift: 'OFF', ot: 0 }, 4: { shift: 'M', ot: 0 }, 5: { shift: 'M', ot: 4 },
-    6: { shift: 'OFF', ot: 0 }, 7: { shift: 'M', ot: 0 }, 8: { shift: 'M', ot: 0 }, 9: { shift: 'E', ot: 0 }, 10: { shift: 'N8', ot: 0 },
-  },
-  'S3': {
-    1: { shift: 'M', ot: 0 }, 2: { shift: 'M', ot: 0 }, 3: { shift: 'M', ot: 0 }, 4: { shift: 'M', ot: 0 }, 5: { shift: 'M', ot: 0 },
-    6: { shift: 'OFF', ot: 0 }, 7: { shift: 'OFF', ot: 0 }, 8: { shift: 'M', ot: 0 }, 9: { shift: 'M', ot: 0 }, 10: { shift: 'M', ot: 8 },
-  }
-};
+export const MOCK_ROSTER = {};
 
 // ---- Generic CRUD ----
 
@@ -125,6 +133,17 @@ export function saveDepartments(depts) {
   return saveData(KEYS.DEPARTMENTS, depts);
 }
 
+// ---- Active Month ----
+
+export function loadActiveMonth() {
+  const config = loadConfig(); // Get current config to use as fallback
+  return loadData('nss_active_view_month', config.month || new Date().toISOString().slice(0, 7));
+}
+
+export function saveActiveMonth(month) {
+  return saveData('nss_active_view_month', month);
+}
+
 function getScopedKey(baseKey) {
   const activeDept = loadActiveDepartment();
   return `${baseKey}_${activeDept.id}`;
@@ -158,7 +177,10 @@ export function saveShiftTypes(shiftTypes) {
 // ---- Staff List ----
 
 export function loadStaffList() {
-  return loadData(getScopedKey(SCOPED_KEYS.STAFF_LIST), MOCK_STAFF);
+  const activeDept = loadActiveDepartment();
+  // Only use MOCK_STAFF as a fallback for the built-in default department
+  const defaultStaff = activeDept.id === 'default' ? MOCK_STAFF : [];
+  return loadData(getScopedKey(SCOPED_KEYS.STAFF_LIST), defaultStaff);
 }
 
 export function saveStaffList(staffList) {
@@ -230,6 +252,8 @@ export function isWeekend(yearMonth, day) {
   const dow = date.getDay();
   return dow === 0 || dow === 6;
 }
+
+
 
 export function generateStaffId() {
   return 'S' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 5).toUpperCase();

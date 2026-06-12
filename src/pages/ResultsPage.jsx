@@ -7,7 +7,9 @@ import {
 import {
   loadConfig, loadShiftTypes, loadStaffList,
   loadMonthlyRoster, getDaysInMonth, getMonthName,
+  loadActiveMonth, saveActiveMonth
 } from '../utils/storage';
+import MonthSelector from '../components/MonthSelector';
 import {
   buildShiftTypesMap, calcMonthlyHours, calcWeeklyHours,
   detectQuickReturns, calcDailyCoverage, checkCoverageRequirements,
@@ -25,18 +27,33 @@ export default function ResultsPage() {
   const [staffList, setStaffList] = useState([]);
   const [roster, setRoster] = useState({});
   const [selectedValidationStaff, setSelectedValidationStaff] = useState(null);
+  const [viewMonth, setViewMonthState] = useState(loadActiveMonth());
+
+  const setViewMonth = (m) => {
+    setViewMonthState(m);
+    saveActiveMonth(m);
+  };
 
   useEffect(() => {
     const loadedConfig = loadConfig();
     setConfig(loadedConfig);
     setShiftTypes(loadShiftTypes());
     setStaffList(loadStaffList());
-    setRoster(loadMonthlyRoster(loadedConfig.month));
+    const month = loadActiveMonth();
+    setViewMonth(month);
+    setRoster(loadMonthlyRoster(month));
   }, []);
+
+  // Reload roster when viewMonth changes
+  useEffect(() => {
+    if (viewMonth) {
+      setRoster(loadMonthlyRoster(viewMonth));
+    }
+  }, [viewMonth]);
 
   const activeStaff = useMemo(() => staffList.filter(s => s.active), [staffList]);
   const shiftTypesMap = useMemo(() => buildShiftTypesMap(shiftTypes), [shiftTypes]);
-  const daysInMonth = useMemo(() => getDaysInMonth(config.month), [config.month]);
+  const daysInMonth = useMemo(() => getDaysInMonth(viewMonth), [viewMonth]);
   const days = useMemo(() => Array.from({ length: daysInMonth }, (_, i) => i + 1), [daysInMonth]);
 
   // Stats
@@ -57,7 +74,7 @@ export default function ResultsPage() {
     });
     const totalHours = totalShiftHours + totalOTHours;
     const avgHours = hours.length > 0 ? Math.round(totalHours / hours.length) : 0;
-    const violations = countViolations(roster, staffList, shiftTypesMap, config, config.month);
+    const violations = countViolations(roster, staffList, shiftTypesMap, config, viewMonth);
 
     const coverage = calcDailyCoverage(roster, activeStaff.map(s => s.id), shiftTypesMap);
     const coverageCheck = checkCoverageRequirements(coverage, config);
@@ -122,8 +139,8 @@ export default function ResultsPage() {
   // Weekly Summary Data
   const weeklySummary = useMemo(() => {
     return activeStaff.map(s => {
-      const weeks = calcWeeklyHours(roster[s.id] || {}, shiftTypesMap, config.month);
-      const qr = detectQuickReturns(roster[s.id] || {}, shiftTypesMap, config.min_rest_hours, config.month);
+      const weeks = calcWeeklyHours(roster[s.id] || {}, shiftTypesMap, viewMonth);
+      const qr = detectQuickReturns(roster[s.id] || {}, shiftTypesMap, config.min_rest_hours, viewMonth);
       return {
         staff: s,
         weeks,
@@ -135,7 +152,7 @@ export default function ResultsPage() {
 
   // Validation Check data
   const validationData = useMemo(() => {
-    return buildStaffValidation(roster, staffList, shiftTypesMap, config, config.month);
+    return buildStaffValidation(roster, staffList, shiftTypesMap, config, viewMonth);
   }, [roster, staffList, shiftTypesMap, config]);
 
   const selectedRow = validationData.find(r => r.staff.id === selectedValidationStaff) || validationData[0] || null;
@@ -163,7 +180,10 @@ export default function ResultsPage() {
       <div className="page-header">
         <div className="page-header-left">
           <h1>📊 ตรวจสอบผลลัพธ์</h1>
-          <p>{getMonthName(config.month)} — {config.unit_name || config.hospital_name}</p>
+          <p>{getMonthName(viewMonth)} — {config.unit_name || config.hospital_name}</p>
+        </div>
+        <div className="page-header-actions">
+          <MonthSelector value={viewMonth} onChange={setViewMonth} />
         </div>
       </div>
 

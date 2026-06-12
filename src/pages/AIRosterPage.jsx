@@ -5,7 +5,9 @@ import {
   loadConfig, loadShiftTypes, loadStaffList,
   loadMonthlyRoster, saveMonthlyRoster, saveAIRoster,
   getDaysInMonth, getDayOfWeek, isWeekend, getMonthName,
+  loadActiveMonth, saveActiveMonth,
 } from '../utils/storage';
+import MonthSelector from '../components/MonthSelector';
 import { buildShiftTypesMap, calcMonthlyHours } from '../utils/scheduling';
 import { generateAIRoster } from '../utils/aiRoster';
 import StatCard from '../components/StatCard';
@@ -18,18 +20,25 @@ export default function AIRosterPage() {
   const [result, setResult] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [applied, setApplied] = useState(false);
+  const [viewMonth, setViewMonthState] = useState(loadActiveMonth());
+
+  const setViewMonth = (m) => {
+    setViewMonthState(m);
+    saveActiveMonth(m);
+  };
 
   useEffect(() => {
     const loadedConfig = loadConfig();
     setConfig(loadedConfig);
     setShiftTypes(loadShiftTypes());
     setStaffList(loadStaffList());
+    setViewMonth(loadedConfig.month);
   }, []);
 
   const activeStaff = useMemo(() => staffList.filter(s => s.active), [staffList]);
   const activeShifts = useMemo(() => shiftTypes.filter(s => s.active), [shiftTypes]);
   const shiftTypesMap = useMemo(() => buildShiftTypesMap(shiftTypes), [shiftTypes]);
-  const daysInMonth = useMemo(() => getDaysInMonth(config.month), [config.month]);
+  const daysInMonth = useMemo(() => getDaysInMonth(viewMonth), [viewMonth]);
   const days = useMemo(() => Array.from({ length: daysInMonth }, (_, i) => i + 1), [daysInMonth]);
 
   const handleGenerate = () => {
@@ -37,7 +46,8 @@ export default function AIRosterPage() {
     setApplied(false);
     // Use setTimeout to show loading state
     setTimeout(() => {
-      const res = generateAIRoster(staffList, shiftTypes, config);
+      const aiConfig = { ...config, month: viewMonth };
+      const res = generateAIRoster(staffList, shiftTypes, aiConfig);
       setResult(res);
       saveAIRoster(res);
       setGenerating(false);
@@ -46,7 +56,7 @@ export default function AIRosterPage() {
 
   const handleApply = () => {
     if (!result) return;
-    saveMonthlyRoster(result.roster, config.month);
+    saveMonthlyRoster(result.roster, viewMonth);
     setApplied(true);
     setTimeout(() => {
       setApplied(false);
@@ -97,7 +107,7 @@ export default function AIRosterPage() {
       <div className="page-header">
         <div className="page-header-left">
           <h1>🤖 AI จัดเวรอัตโนมัติ</h1>
-          <p>{getMonthName(config.month)} — {config.unit_name || config.hospital_name}</p>
+          <p>{getMonthName(viewMonth)} — {config.unit_name || config.hospital_name}</p>
         </div>
         <div className="page-header-actions">
           <button
@@ -120,6 +130,7 @@ export default function AIRosterPage() {
               {applied ? 'นำไปใช้แล้ว!' : 'นำไปใช้ใน Monthly Roster'}
             </button>
           )}
+          <MonthSelector value={viewMonth} onChange={(m) => { setViewMonth(m); setResult(null); }} />
         </div>
       </div>
 
@@ -211,13 +222,13 @@ export default function AIRosterPage() {
                       <th
                         key={d}
                         style={{
-                          background: isWeekend(config.month, d) ? 'rgba(245,158,11,0.08)' : undefined,
+                          background: isWeekend(viewMonth, d) ? 'rgba(245,158,11,0.08)' : undefined,
                           minWidth: 44,
                         }}
                       >
                         <div>{d}</div>
-                        <div style={{ fontSize: '0.6rem', color: isWeekend(config.month, d) ? 'var(--color-accent)' : 'var(--color-text-muted)' }}>
-                          {getDayOfWeek(config.month, d)}
+                        <div style={{ fontSize: '0.6rem', color: isWeekend(viewMonth, d) ? 'var(--color-accent)' : 'var(--color-text-muted)' }}>
+                          {getDayOfWeek(viewMonth, d)}
                         </div>
                       </th>
                     ))}
@@ -236,7 +247,7 @@ export default function AIRosterPage() {
                         </td>
                         {days.map(d => (
                           <td key={d} style={{
-                            background: isWeekend(config.month, d) ? 'rgba(245,158,11,0.04)' : undefined,
+                            background: isWeekend(viewMonth, d) ? 'rgba(245,158,11,0.04)' : undefined,
                             padding: 2,
                           }}>
                             <div className={`roster-cell-select ${getShiftClass(staffRoster[d])}`}

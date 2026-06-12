@@ -5,6 +5,10 @@
 
 import { getShiftHours, detectQuickReturns, buildShiftTypesMap } from './scheduling';
 
+export function isSenior(staff) {
+  return staff.position === 'RN' && ['RN2', 'RN3', 'RN4', 'RN5'].includes(staff.level);
+}
+
 /**
  * Generate AI roster for all active staff
  * @param {Array} staffList - Active staff members
@@ -66,7 +70,8 @@ export function generateAIRoster(staffList, shiftTypes, config) {
       if (!shiftTypesMap[shiftCode] || !shiftTypesMap[shiftCode].active) continue;
 
       for (let i = 0; i < required && staffPool.length > 0; i++) {
-        const staffIdx = findBestStaff(staffPool, roster, shiftCode, day, shiftTypesMap, config, daysInMonth);
+        const assignedStaffThisShift = activeStaff.filter(s => dayAssignments[s.id] === shiftCode);
+        const staffIdx = findBestStaff(staffPool, roster, shiftCode, day, shiftTypesMap, config, daysInMonth, assignedStaffThisShift);
         if (staffIdx >= 0) {
           const staff = staffPool[staffIdx];
           roster[staff.id][day] = shiftCode;
@@ -103,8 +108,10 @@ export function generateAIRoster(staffList, shiftTypes, config) {
         const chosen = availableShifts[0];
 
         // Check constraints before assigning
-        if (isAssignmentValid(roster, staff.id, day, chosen.code, shiftTypesMap, config)) {
+        const assignedStaffThisShift = activeStaff.filter(s => dayAssignments[s.id] === chosen.code);
+        if (isAssignmentValid(roster, staff, day, chosen.code, shiftTypesMap, config, assignedStaffThisShift)) {
           roster[staff.id][day] = chosen.code;
+          dayAssignments[staff.id] = chosen.code;
           dayCoverage[chosen.code] = (dayCoverage[chosen.code] || 0) + 1;
         } else {
           roster[staff.id][day] = 'OFF';
@@ -130,21 +137,27 @@ export function generateAIRoster(staffList, shiftTypes, config) {
 /**
  * Find the best staff member for a given shift on a day
  */
-function findBestStaff(pool, roster, shiftCode, day, shiftTypesMap, config, daysInMonth) {
+function findBestStaff(pool, roster, shiftCode, day, shiftTypesMap, config, daysInMonth, assignedStaffThisShift = []) {
   let bestIdx = -1;
   let bestScore = -1;
+  const hasSenior = assignedStaffThisShift.some(isSenior);
 
   for (let i = 0; i < pool.length; i++) {
     const staff = pool[i];
 
     // Check if assignment is valid
-    if (!isAssignmentValid(roster, staff.id, day, shiftCode, shiftTypesMap, config)) {
+    if (!isAssignmentValid(roster, staff, day, shiftCode, shiftTypesMap, config, assignedStaffThisShift)) {
       continue;
     }
 
     // Score: prefer staff with fewer hours
     const currentHours = calcCurrentHours(roster[staff.id], shiftTypesMap);
-    const score = 1000 - currentHours;
+    let score = 1000 - currentHours;
+
+    // Rule: Prioritize seniors if the shift doesn't have one yet
+    if (!hasSenior && isSenior(staff)) {
+      score += 5000;
+    }
 
     // Prefer staff whose preferred shift matches
     if (staff.preferred_shifts && staff.preferred_shifts.includes(shiftCode)) {
@@ -164,7 +177,8 @@ function findBestStaff(pool, roster, shiftCode, day, shiftTypesMap, config, days
 /**
  * Check if assigning a shift is valid (no constraint violations)
  */
-function isAssignmentValid(roster, staffId, day, shiftCode, shiftTypesMap, config) {
+function isAssignmentValid(roster, staff, day, shiftCode, shiftTypesMap, config, assignedStaffThisShift = []) {
+  const staffId = staff.id;
   const staffRoster = roster[staffId];
 
   // Check previous day for Quick Return
@@ -194,6 +208,14 @@ function isAssignmentValid(roster, staffId, day, shiftCode, shiftTypesMap, confi
   // Check daily hours limit
   const shiftHours = getShiftHours(shiftCode, shiftTypesMap);
   if (shiftHours > config.max_daily_hours) return false;
+
+  // Check RN1 supervision constraint
+  if (staff.level === 'RN1') {
+    const hasSenior = assignedStaffThisShift.some(isSenior);
+    if (!hasSenior) {
+      return false; // RN1 cannot be assigned if there is no senior currently on this shift
+    }
+  }
 
   return true;
 }

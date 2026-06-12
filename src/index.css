@@ -952,6 +952,82 @@ a:hover {
   flex-wrap: wrap;
 }
 
+/* ---- Month Selector ---- */
+.month-selector {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  background: var(--color-bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  padding: 2px;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-normal);
+}
+
+.month-selector:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-glow);
+}
+
+.month-selector-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.month-selector-btn:hover {
+  background: var(--color-primary-glow);
+  color: var(--color-primary);
+}
+
+.month-selector-btn:active {
+  transform: scale(0.9);
+}
+
+.month-selector-label {
+  position: relative;
+  display: inline-block;
+}
+
+.month-selector-input-hidden {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+}
+
+.month-selector-display-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  border: 1px solid var(--border-color);
+  color: var(--color-text-primary);
+  border-radius: var(--radius-sm);
+  padding: 6px 16px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  pointer-events: none; /* Let clicks pass to the hidden input */
+}
+
+.month-selector-label:hover .month-selector-display-btn {
+  border-color: var(--color-primary);
+}
+
 /* ---- Utilities ---- */
 .flex { display: flex; }
 .flex-col { flex-direction: column; }
