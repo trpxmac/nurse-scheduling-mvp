@@ -340,7 +340,7 @@ export default function MonthlyRosterPage() {
               {activeRoles.map(role => (
                 <tr key={`role-count-${role}`} className="coverage-row" style={{ opacity: 0.85, height: '32px' }}>
                   <td className="staff-name-cell" style={{ background: 'var(--color-bg-tertiary)', textAlign: 'right', paddingRight: '12px' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>รวม {role}</span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{role}</span>
                   </td>
                   {days.map(d => (
                     <td key={`rc-${d}`} style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
@@ -355,7 +355,7 @@ export default function MonthlyRosterPage() {
               {/* Total Staff Row */}
               <tr className="coverage-row" style={{ background: 'rgba(59,130,246,0.05)', height: '36px' }}>
                 <td className="staff-name-cell" style={{ textAlign: 'right', paddingRight: '12px' }}>
-                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-primary-dark)' }}>รวมผู้ปฏิบัติงานทั้งหมด</span>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-primary-dark)' }}>Total</span>
                 </td>
                 {days.map(d => (
                   <td key={`tc-${d}`} style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-primary-dark)' }}>
