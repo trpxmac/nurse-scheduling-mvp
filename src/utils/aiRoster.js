@@ -30,16 +30,15 @@ export function generateAIRoster(staffList, shiftTypes, config) {
   const daysInMonth = new Date(year, month, 0).getDate();
 
   // Determine which shifts to use based on shift_mode
-  let workShifts;
+  // AI should only automatically generate working shifts (hours > 0)
+  let workShifts = activeShifts.filter(s => s.hours > 0);
   if (config.shift_mode === '8HR') {
-    workShifts = activeShifts.filter(s => s.hours === 8);
+    workShifts = workShifts.filter(s => s.hours === 8);
   } else if (config.shift_mode === '12HR') {
-    workShifts = activeShifts.filter(s => s.hours === 12);
-  } else {
-    workShifts = activeShifts;
+    workShifts = workShifts.filter(s => s.hours === 12);
   }
 
-  if (workShifts.length === 0) workShifts = activeShifts;
+  if (workShifts.length === 0) workShifts = activeShifts.filter(s => s.hours > 0);
 
   const roster = {};
   for (const staff of activeStaff) {
