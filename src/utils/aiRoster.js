@@ -78,17 +78,17 @@ export function generateAIRoster(staffList, shiftTypes, config) {
 
     // Phase 2: Assign remaining staff (some work, some OFF)
     for (const staff of staffPool) {
-      // Check if staff should get OFF (aim for ~5-6 days off per month)
-      const totalAssigned = Object.values(roster[staff.id]).filter(v => v && v !== 'OFF').length;
-      const targetWorkDays = Math.round(daysInMonth * 5 / 7); // ~22 days
+      // Check if staff has reached maximum allowed hours for the month
+      const currentHours = calcCurrentHours(roster[staff.id], shiftTypesMap);
+      const targetWorkHours = (config.max_weekly_hours || 48) * (daysInMonth / 7);
 
-      if (totalAssigned >= targetWorkDays) {
+      if (currentHours >= targetWorkHours) {
         roster[staff.id][day] = 'OFF';
         continue;
       }
 
       // Determine probability of OFF (increase as we approach target)
-      const ratio = totalAssigned / targetWorkDays;
+      const ratio = currentHours / targetWorkHours;
       if (Math.random() < ratio * 0.3) {
         roster[staff.id][day] = 'OFF';
         continue;
