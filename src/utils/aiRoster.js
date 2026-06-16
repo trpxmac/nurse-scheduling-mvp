@@ -140,7 +140,7 @@ export function generateAIRoster(staffList, shiftTypes, config) {
  */
 function findBestStaff(pool, roster, shiftCode, day, shiftTypesMap, config, daysInMonth, assignedStaffThisShift = []) {
   let bestIdx = -1;
-  let bestScore = -1;
+  let bestScore = -Infinity;
   const hasSenior = assignedStaffThisShift.some(isSenior);
 
   for (let i = 0; i < pool.length; i++) {
