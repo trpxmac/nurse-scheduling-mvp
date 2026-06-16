@@ -104,8 +104,15 @@ export function generateAIRoster(staffList, shiftTypes, config) {
       // Find a suitable shift
       const availableShifts = workShifts.filter(s => s.code !== 'OFF');
       if (availableShifts.length > 0) {
-        // Pick the shift with least coverage
-        availableShifts.sort((a, b) => (dayCoverage[a.code] || 0) - (dayCoverage[b.code] || 0));
+        // Pick the shift this staff has done the least, then by least coverage
+        availableShifts.sort((a, b) => {
+          const aStaffCount = Object.values(roster[staff.id]).filter(v => v === a.code).length;
+          const bStaffCount = Object.values(roster[staff.id]).filter(v => v === b.code).length;
+          if (aStaffCount !== bStaffCount) {
+             return aStaffCount - bStaffCount; 
+          }
+          return (dayCoverage[a.code] || 0) - (dayCoverage[b.code] || 0);
+        });
         const chosen = availableShifts[0];
 
         // Check constraints before assigning
@@ -154,6 +161,10 @@ function findBestStaff(pool, roster, shiftCode, day, shiftTypesMap, config, days
     // Score: prefer staff with fewer hours
     const currentHours = calcCurrentHours(roster[staff.id], shiftTypesMap);
     let score = 1000 - currentHours;
+
+    // Penalize if the staff already has a lot of THIS specific shift to ensure equal distribution
+    const currentShiftCount = Object.values(roster[staff.id]).filter(v => v === shiftCode).length;
+    score -= (currentShiftCount * 50);
 
     // Rule: Prioritize seniors if the shift doesn't have one yet
     if (!hasSenior && isSenior(staff)) {
