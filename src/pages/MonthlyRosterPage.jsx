@@ -75,6 +75,38 @@ export default function MonthlyRosterPage() {
     return checkCoverageRequirements(coverage, config);
   }, [coverage, config]);
 
+  const activeRoles = useMemo(() => {
+    const roles = new Set();
+    for (const staff of activeStaff) {
+      roles.add(staff.level && staff.level !== '-' ? staff.level : staff.position);
+    }
+    // Sort roles so RN4 comes before RN3, etc. Reverse alphabetical works well for RN4...RN1, PN, PA.
+    return Array.from(roles).sort().reverse();
+  }, [activeStaff]);
+
+  const dailyStaffCounts = useMemo(() => {
+    const counts = {};
+    days.forEach(d => {
+      counts[d] = { total: 0, roles: {} };
+    });
+    
+    for (const staff of activeStaff) {
+      const role = staff.level && staff.level !== '-' ? staff.level : staff.position;
+      const sr = roster[staff.id] || {};
+      for (const d of days) {
+        const { shift } = parseShift(sr[d]);
+        if (shift && shift !== '') {
+          const st = shiftTypesMap[shift];
+          if (st && st.hours > 0) {
+            counts[d].total++;
+            counts[d].roles[role] = (counts[d].roles[role] || 0) + 1;
+          }
+        }
+      }
+    }
+    return counts;
+  }, [roster, activeStaff, shiftTypesMap, days]);
+
   const handleShiftChange = (staffId, day, { shift, ot, otType = '' }) => {
     setRoster(prev => {
       const staffRoster = prev[staffId] || {};
@@ -303,6 +335,36 @@ export default function MonthlyRosterPage() {
                   </tr>
                 );
               })}
+
+              {/* Staff Count by Role Rows */}
+              {activeRoles.map(role => (
+                <tr key={`role-count-${role}`} className="coverage-row" style={{ opacity: 0.85, height: '32px' }}>
+                  <td className="staff-name-cell" style={{ background: 'var(--color-bg-tertiary)', textAlign: 'right', paddingRight: '12px' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>รวม {role}</span>
+                  </td>
+                  {days.map(d => (
+                    <td key={`rc-${d}`} style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                      {dailyStaffCounts[d]?.roles[role] || 0}
+                    </td>
+                  ))}
+                  <td className="total-cell" style={{ borderLeft: '1px solid var(--border-color)' }}>-</td>
+                  <td className="total-cell">-</td>
+                </tr>
+              ))}
+              
+              {/* Total Staff Row */}
+              <tr className="coverage-row" style={{ background: 'rgba(59,130,246,0.05)', height: '36px' }}>
+                <td className="staff-name-cell" style={{ textAlign: 'right', paddingRight: '12px' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-primary-dark)' }}>รวมผู้ปฏิบัติงานทั้งหมด</span>
+                </td>
+                {days.map(d => (
+                  <td key={`tc-${d}`} style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-primary-dark)' }}>
+                    {dailyStaffCounts[d]?.total || 0}
+                  </td>
+                ))}
+                <td className="total-cell" style={{ borderLeft: '1px solid var(--border-color)' }}>-</td>
+                <td className="total-cell">-</td>
+              </tr>
             </tbody>
           </table>
         </div>
