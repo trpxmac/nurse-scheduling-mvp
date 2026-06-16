@@ -182,7 +182,7 @@ function findBestStaff(pool, roster, shiftCode, day, shiftTypesMap, config, days
 
     // Penalize if the staff already has this specific shift (secondary priority)
     const currentShiftCount = Object.values(roster[staff.id]).filter(v => v === shiftCode).length;
-    score -= (currentShiftCount * 30);
+    score -= (currentShiftCount * 500);
 
     // Rule: Prioritize seniors if the shift doesn't have one yet
     if (!hasSenior && isSenior(staff)) {
