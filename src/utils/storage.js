@@ -16,6 +16,7 @@ const SCOPED_KEYS = {
   MONTHLY_ROSTER: `${STORAGE_PREFIX}monthly_roster`,
   AI_ROSTER: `${STORAGE_PREFIX}ai_roster`,
   LEAVE_SCHEDULES: `${STORAGE_PREFIX}leave_schedules`,
+  MONTHLY_SETTINGS: `${STORAGE_PREFIX}monthly_settings`,
 };
 // ---- Default Data ----
 
@@ -173,6 +174,24 @@ export function loadConfig() {
 
 export function saveConfig(config) {
   return saveData(getScopedKey(SCOPED_KEYS.CONFIG), config);
+}
+
+// ---- Monthly Settings (Roster/Holiday Hours) ----
+
+export function loadMonthlySettings(month) {
+  const allSettings = loadData(getScopedKey(SCOPED_KEYS.MONTHLY_SETTINGS), {});
+  // Defaults to config if not set for month
+  const config = loadConfig();
+  return allSettings[month] || {
+    roster_hours: config.roster_hours || 0,
+    holiday_hours: config.holiday_hours || 0
+  };
+}
+
+export function saveMonthlySettings(month, settings) {
+  const allSettings = loadData(getScopedKey(SCOPED_KEYS.MONTHLY_SETTINGS), {});
+  allSettings[month] = settings;
+  return saveData(getScopedKey(SCOPED_KEYS.MONTHLY_SETTINGS), allSettings);
 }
 
 // ---- Shift Types ----

@@ -7,7 +7,7 @@ import {
 import {
   loadConfig, loadShiftTypes, loadStaffList,
   loadMonthlyRoster, getDaysInMonth, getMonthName,
-  loadActiveMonth, saveActiveMonth
+  loadActiveMonth, saveActiveMonth, loadMonthlySettings
 } from '../utils/storage';
 import MonthSelector from '../components/MonthSelector';
 import {
@@ -28,6 +28,7 @@ export default function ResultsPage() {
   const [roster, setRoster] = useState({});
   const [selectedValidationStaff, setSelectedValidationStaff] = useState(null);
   const [viewMonth, setViewMonthState] = useState(loadActiveMonth());
+  const [monthlySettings, setMonthlySettings] = useState({ roster_hours: 0, holiday_hours: 0 });
 
   const setViewMonth = (m) => {
     setViewMonthState(m);
@@ -35,19 +36,20 @@ export default function ResultsPage() {
   };
 
   useEffect(() => {
-    const loadedConfig = loadConfig();
-    setConfig(loadedConfig);
+    setConfig(loadConfig());
     setShiftTypes(loadShiftTypes());
     setStaffList(loadStaffList());
     const month = loadActiveMonth();
     setViewMonth(month);
     setRoster(loadMonthlyRoster(month));
+    setMonthlySettings(loadMonthlySettings(month));
   }, []);
 
   // Reload roster when viewMonth changes
   useEffect(() => {
     if (viewMonth) {
       setRoster(loadMonthlyRoster(viewMonth));
+      setMonthlySettings(loadMonthlySettings(viewMonth));
     }
   }, [viewMonth]);
 
@@ -61,17 +63,22 @@ export default function ResultsPage() {
   const stats = useMemo(() => {
     let totalShiftHours = 0;
     let totalOTHours = 0;
+    const reqHrs = Number(monthlySettings.roster_hours) || 0;
+    const holHrs = Number(monthlySettings.holiday_hours) || 0;
+    const targetHrs = Math.max(0, reqHrs - holHrs);
+
     const hours = activeStaff.map(s => {
-      let sh = 0; let oh = 0;
+      let sh = 0; let manualOt = 0;
       const sr = roster[s.id] || {};
       for (const d of Object.keys(sr)) {
          const { shift, ot } = parseShift(sr[d]);
          sh += getShiftHours(shift, shiftTypesMap);
-         oh += ot;
+         manualOt += ot;
       }
+      const finalOt = targetHrs > 0 ? Math.max(0, sh - targetHrs) : manualOt;
       totalShiftHours += sh;
-      totalOTHours += oh;
-      return sh + oh;
+      totalOTHours += finalOt;
+      return sh + finalOt;
     });
     const totalHours = totalShiftHours + totalOTHours;
     const avgHours = hours.length > 0 ? Math.round(totalHours / hours.length) : 0;
@@ -84,27 +91,32 @@ export default function ResultsPage() {
     const coverageRate = coverageTotal > 0 ? Math.round((coverageMet / coverageTotal) * 100) : 0;
 
     return { totalHours, totalShiftHours, totalOTHours, avgHours, violations, coverageRate, coverageMet, coverageTotal, hours };
-  }, [roster, activeStaff, shiftTypesMap, config, staffList]);
+  }, [roster, activeStaff, shiftTypesMap, config, staffList, monthlySettings]);
 
   // Chart Data
   const hoursChartData = useMemo(() => {
+    const reqHrs = Number(monthlySettings.roster_hours) || 0;
+    const holHrs = Number(monthlySettings.holiday_hours) || 0;
+    const targetHrs = Math.max(0, reqHrs - holHrs);
+
     return activeStaff.map(s => {
       let shiftHours = 0;
-      let otHours = 0;
+      let manualOt = 0;
       const sr = roster[s.id] || {};
       for (const d of Object.keys(sr)) {
          const { shift, ot } = parseShift(sr[d]);
          shiftHours += getShiftHours(shift, shiftTypesMap);
-         otHours += ot;
+         manualOt += ot;
       }
+      const finalOt = targetHrs > 0 ? Math.max(0, shiftHours - targetHrs) : manualOt;
       return {
         name: s.nickname || s.firstName,
         shiftHours,
-        otHours,
-        total: shiftHours + otHours
+        otHours: finalOt,
+        total: shiftHours + finalOt
       };
     });
-  }, [activeStaff, roster, shiftTypesMap]);
+  }, [activeStaff, roster, shiftTypesMap, monthlySettings]);
 
   const coverageChartData = useMemo(() => {
     const coverage = calcDailyCoverage(roster, activeStaff.map(s => s.id), shiftTypesMap);
@@ -177,11 +189,14 @@ export default function ResultsPage() {
 
   // Staff Shift Summary Data
   const staffShiftSummary = useMemo(() => {
+    const reqHrs = Number(monthlySettings.roster_hours) || 0;
+    const holHrs = Number(monthlySettings.holiday_hours) || 0;
+    const targetHrs = Math.max(0, reqHrs - holHrs);
+
     return activeStaff.map(s => {
       const counts = {};
-      let totalHours = 0;
       let totalShiftHours = 0;
-      let totalOTHours = 0;
+      let manualOt = 0;
       let totalWorkingShifts = 0;
       
       activeShifts.forEach(st => counts[st.code] = 0);
@@ -199,13 +214,16 @@ export default function ResultsPage() {
         
         const stHours = getShiftHours(shift, shiftTypesMap);
         totalShiftHours += stHours;
-        totalOTHours += ot;
-        totalHours += stHours + ot;
+        manualOt += ot;
         if (stHours > 0) totalWorkingShifts++;
       }
-      return { staff: s, counts, totalHours, totalShiftHours, totalOTHours, totalWorkingShifts };
+      
+      const finalOt = targetHrs > 0 ? Math.max(0, totalShiftHours - targetHrs) : manualOt;
+      const totalHours = totalShiftHours + finalOt;
+      
+      return { staff: s, counts, totalHours, totalShiftHours, totalOTHours: finalOt, totalWorkingShifts, targetHrs };
     });
-  }, [roster, activeStaff, shiftTypesMap, activeShifts]);
+  }, [roster, activeStaff, shiftTypesMap, activeShifts, monthlySettings]);
 
   const tabs = [
     { id: 'dashboard', label: '📊 Dashboard' },
@@ -372,6 +390,7 @@ export default function ResultsPage() {
                     </th>
                   ))}
                   <th style={{ borderLeft: '1px solid var(--border-color)', textAlign: 'center' }}>รวมเวรทำงาน (วัน)</th>
+                  <th style={{ textAlign: 'center' }}>เป้าหมาย (ชม.)</th>
                   <th style={{ textAlign: 'center' }}>ชม. ปกติ</th>
                   <th style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>ชม. OT</th>
                   <th style={{ textAlign: 'center' }}>รวมทั้งหมด (ชม.)</th>
@@ -380,7 +399,7 @@ export default function ResultsPage() {
               <tbody>
                 {staffShiftSummary.map(row => (
                   <tr key={row.staff.id}>
-                    <td style={{ fontWeight: 600 }}>{row.staff.nickname || row.staff.firstName}</td>
+                    <td style={{ fontWeight: 600 }}>{row.staff.firstName} {row.staff.lastName} <span style={{fontSize: '0.75rem', color: 'var(--color-text-muted)'}}>({row.staff.nickname})</span></td>
                     <td><span className="badge badge-info">{row.staff.position}</span></td>
                     {activeShifts.map(st => (
                       <td 
@@ -397,13 +416,16 @@ export default function ResultsPage() {
                     <td style={{ textAlign: 'center', fontWeight: 600, borderLeft: '1px solid var(--border-color)' }}>
                       {row.totalWorkingShifts}
                     </td>
+                    <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+                      {row.targetHrs > 0 ? row.targetHrs : '-'}
+                    </td>
                     <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--color-primary-dark)' }}>
                       {row.totalShiftHours}
                     </td>
-                    <td style={{ textAlign: 'center', fontWeight: 600, color: '#9ca3af' }}>
-                      {row.totalOTHours}
+                    <td style={{ textAlign: 'center', fontWeight: 700, color: row.totalOTHours > 0 ? 'var(--color-danger)' : 'var(--color-text-muted)' }}>
+                      {row.totalOTHours > 0 ? `+${row.totalOTHours}` : '0'}
                     </td>
-                    <td style={{ textAlign: 'center', fontWeight: 700 }}>
+                    <td style={{ textAlign: 'center', fontWeight: 700, background: 'rgba(59,130,246,0.05)' }}>
                       {row.totalHours}
                     </td>
                   </tr>

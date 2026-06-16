@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Settings, Save, RotateCcw, CheckCircle, Clock, Users, Moon, UserX, Plus, Trash2 } from 'lucide-react';
-import { loadConfig, saveConfig, DEFAULT_CONFIG, getMonthName, loadActiveDepartment, saveActiveDepartment, loadDepartments, saveDepartments } from '../utils/storage';
+import { loadConfig, saveConfig, DEFAULT_CONFIG, getMonthName, loadActiveDepartment, saveActiveDepartment, loadDepartments, saveDepartments, loadMonthlySettings, saveMonthlySettings } from '../utils/storage';
 
 export default function ConfigPage() {
   const [config, setConfig] = useState(DEFAULT_CONFIG);
+  const [monthlyConfig, setMonthlyConfig] = useState({ roster_hours: '', holiday_hours: '' });
   const [saved, setSaved] = useState(false);
   const [level1, setLevel1] = useState('RN1');
   const [level2, setLevel2] = useState('RN1');
@@ -11,11 +12,21 @@ export default function ConfigPage() {
   const LEVELS = ['RN4', 'RN3', 'RN2', 'RN1', 'PN', 'PA', 'NA'];
 
   useEffect(() => {
-    setConfig(loadConfig());
+    const cfg = loadConfig();
+    setConfig(cfg);
+    setMonthlyConfig(loadMonthlySettings(cfg.month));
   }, []);
 
   const handleChange = (field, value) => {
     setConfig(prev => ({ ...prev, [field]: value }));
+    setSaved(false);
+    if (field === 'month') {
+      setMonthlyConfig(loadMonthlySettings(value));
+    }
+  };
+
+  const handleMonthlyChange = (field, value) => {
+    setMonthlyConfig(prev => ({ ...prev, [field]: value }));
     setSaved(false);
   };
 
@@ -26,6 +37,7 @@ export default function ConfigPage() {
 
   const handleSave = () => {
     saveConfig(config);
+    saveMonthlySettings(config.month, monthlyConfig);
     
     // Sync unit_name to department list
     const activeDept = loadActiveDepartment();
@@ -158,22 +170,22 @@ export default function ConfigPage() {
             <input
               className="form-input"
               type="text"
-              value={config.roster_hours || ''}
-              onChange={(e) => handleChange('roster_hours', e.target.value)}
+              value={monthlyConfig.roster_hours || ''}
+              onChange={(e) => handleMonthlyChange('roster_hours', e.target.value)}
               placeholder="เว้นว่างเพื่อแสดงเป็นเส้นประ"
             />
-            <span className="form-hint">แสดงบนหัวกระดาษตอนพิมพ์ตารางเวร</span>
+            <span className="form-hint">กำหนดเป้าหมายชั่วโมงทำงานของเดือน <strong>{config.month && getMonthName(config.month)}</strong> — นำไปคำนวณ OT รวมท้ายเดือน</span>
           </div>
           <div className="form-group">
             <label className="form-label">ชั่วโมงวันหยุดนักขัตฤกษ์ (Holiday Hours) <code>holiday_hours</code></label>
             <input
               className="form-input"
               type="text"
-              value={config.holiday_hours || ''}
-              onChange={(e) => handleChange('holiday_hours', e.target.value)}
+              value={monthlyConfig.holiday_hours || ''}
+              onChange={(e) => handleMonthlyChange('holiday_hours', e.target.value)}
               placeholder="เว้นว่างเพื่อแสดงเป็นเส้นประ"
             />
-            <span className="form-hint">แสดงบนหัวกระดาษตอนพิมพ์ตารางเวร</span>
+            <span className="form-hint">จำนวนชั่วโมงหยุดนักขัตฤกษ์ของเดือน <strong>{config.month && getMonthName(config.month)}</strong> — นำไปลบออกจาก Roster Hours ตอนคิด OT</span>
           </div>
         </div>
       </div>
