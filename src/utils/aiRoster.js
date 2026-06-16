@@ -41,13 +41,6 @@ export function generateAIRoster(staffList, shiftTypes, config) {
 
   if (workShifts.length === 0) workShifts = activeShifts;
 
-  // Coverage requirements
-  const coverageReqs = {
-    M: config.required_M_coverage || 0,
-    E: config.required_E_coverage || 0,
-    N8: config.required_N8_coverage || 0,
-  };
-
   const roster = {};
   for (const staff of activeStaff) {
     roster[staff.id] = {};
@@ -66,9 +59,10 @@ export function generateAIRoster(staffList, shiftTypes, config) {
     }
 
     // Phase 1: Fill coverage requirements
-    for (const shiftCode of Object.keys(coverageReqs)) {
-      const required = coverageReqs[shiftCode];
-      if (!shiftTypesMap[shiftCode] || !shiftTypesMap[shiftCode].active) continue;
+    for (const shift of workShifts) {
+      const shiftCode = shift.code;
+      const required = config[`required_${shiftCode}_coverage`] || 0;
+      if (required === 0) continue;
 
       for (let i = 0; i < required && staffPool.length > 0; i++) {
         const assignedStaffThisShift = activeStaff.filter(s => dayAssignments[s.id] === shiftCode);
