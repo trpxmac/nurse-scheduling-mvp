@@ -59,7 +59,7 @@ export function generateAIRoster(staffList, shiftTypes, config, lockedSlots = {}
 
   if (hasHolidayShift && numHolidayShifts > 0) {
     for (const staff of activeStaff) {
-      let hCount = 0;
+      let hCount = Object.values(roster[staff.id]).filter(v => v === 'H').length;
       // Pre-fill randomly to empty slots
       const emptyDays = Array.from({length: daysInMonth}, (_, i) => i + 1)
                              .filter(d => roster[staff.id][d] === undefined);
