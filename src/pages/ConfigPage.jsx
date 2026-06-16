@@ -52,13 +52,17 @@ export default function ConfigPage() {
     const reversePair = `${level2}-${level1}`;
     const current = config.incompatible_levels || [];
     if (!current.includes(pair) && !current.includes(reversePair)) {
-      handleChange('incompatible_levels', [...current, pair]);
+      const newConfig = { ...config, incompatible_levels: [...current, pair] };
+      setConfig(newConfig);
+      saveConfig(newConfig);
     }
   };
 
   const handleRemoveIncompatible = (pairToRemove) => {
     const current = config.incompatible_levels || [];
-    handleChange('incompatible_levels', current.filter(p => p !== pairToRemove));
+    const newConfig = { ...config, incompatible_levels: current.filter(p => p !== pairToRemove) };
+    setConfig(newConfig);
+    saveConfig(newConfig);
   };
 
   const mode = config.shift_mode;

@@ -113,9 +113,13 @@ export default function ResultsPage() {
       M: coverage[d]?.M || 0,
       E: coverage[d]?.E || 0,
       N8: coverage[d]?.N8 || 0,
+      D: coverage[d]?.D || 0,
+      N12: coverage[d]?.N12 || 0,
       reqM: config.required_M_coverage || 0,
       reqE: config.required_E_coverage || 0,
       reqN8: config.required_N8_coverage || 0,
+      reqD: config.required_D_coverage || 0,
+      reqN12: config.required_N12_coverage || 0,
     }));
   }, [roster, activeStaff, shiftTypesMap, days, config]);
 
@@ -316,12 +320,29 @@ export default function ResultsPage() {
                       contentStyle={{ background: '#111d35', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 8, color: '#e8ecf4' }}
                     />
                     <Legend />
-                    <Line type="monotone" dataKey="M" stroke="#f59e0b" strokeWidth={2} dot={{ r: 2 }} />
-                    <Line type="monotone" dataKey="E" stroke="#f97316" strokeWidth={2} dot={{ r: 2 }} />
-                    <Line type="monotone" dataKey="N8" stroke="#6366f1" strokeWidth={2} dot={{ r: 2 }} />
-                    <Line type="monotone" dataKey="reqM" stroke="#f59e0b" strokeDasharray="5 5" strokeWidth={1} dot={false} />
-                    <Line type="monotone" dataKey="reqE" stroke="#f97316" strokeDasharray="5 5" strokeWidth={1} dot={false} />
-                    <Line type="monotone" dataKey="reqN8" stroke="#6366f1" strokeDasharray="5 5" strokeWidth={1} dot={false} />
+                    {(() => {
+                      const mode = config.shift_mode || '8HR';
+                      const lines = [];
+                      if (mode === '8HR' || mode === 'MIXED') {
+                        lines.push(
+                          <Line key="l-M" type="monotone" dataKey="M" stroke="#f59e0b" strokeWidth={2} dot={{ r: 2 }} />,
+                          <Line key="l-E" type="monotone" dataKey="E" stroke="#f97316" strokeWidth={2} dot={{ r: 2 }} />,
+                          <Line key="l-N8" type="monotone" dataKey="N8" stroke="#6366f1" strokeWidth={2} dot={{ r: 2 }} />,
+                          <Line key="l-rM" type="monotone" dataKey="reqM" stroke="#f59e0b" strokeDasharray="5 5" strokeWidth={1} dot={false} />,
+                          <Line key="l-rE" type="monotone" dataKey="reqE" stroke="#f97316" strokeDasharray="5 5" strokeWidth={1} dot={false} />,
+                          <Line key="l-rN8" type="monotone" dataKey="reqN8" stroke="#6366f1" strokeDasharray="5 5" strokeWidth={1} dot={false} />
+                        );
+                      }
+                      if (mode === '12HR' || mode === 'MIXED') {
+                        lines.push(
+                          <Line key="l-D" type="monotone" dataKey="D" stroke="#10b981" strokeWidth={2} dot={{ r: 2 }} />,
+                          <Line key="l-N12" type="monotone" dataKey="N12" stroke="#a855f7" strokeWidth={2} dot={{ r: 2 }} />,
+                          <Line key="l-rD" type="monotone" dataKey="reqD" stroke="#10b981" strokeDasharray="5 5" strokeWidth={1} dot={false} />,
+                          <Line key="l-rN12" type="monotone" dataKey="reqN12" stroke="#a855f7" strokeDasharray="5 5" strokeWidth={1} dot={false} />
+                        );
+                      }
+                      return lines;
+                    })()}
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
@@ -714,9 +735,15 @@ export default function ResultsPage() {
               <thead>
                 <tr>
                   <th>วัน</th>
-                  <th><ShiftBadge code="M" /> เวรเช้า</th>
-                  <th><ShiftBadge code="E" /> เวรบ่าย</th>
-                  <th><ShiftBadge code="N8" /> เวรดึก</th>
+                  {(() => {
+                    const mode = config.shift_mode || '8HR';
+                    let coverageShifts = [];
+                    if (mode === '8HR' || mode === 'MIXED') coverageShifts.push('M', 'E', 'N8');
+                    if (mode === '12HR' || mode === 'MIXED') coverageShifts.push('D', 'N12');
+                    return coverageShifts;
+                  })().map(code => (
+                    <th key={code}><ShiftBadge code={code} /> เวร {code}</th>
+                  ))}
                   <th>สถานะ</th>
                 </tr>
               </thead>
@@ -724,21 +751,19 @@ export default function ResultsPage() {
                 {dailyCoverageData.map(row => (
                   <tr key={row.day}>
                     <td style={{ fontWeight: 600 }}>วันที่ {row.day}</td>
-                    <td>
-                      <span className={row.check.details?.M?.met === false ? 'text-danger font-bold' : ''}>
-                        {row.coverage.M || 0} / {config.required_M_coverage || 0}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={row.check.details?.E?.met === false ? 'text-danger font-bold' : ''}>
-                        {row.coverage.E || 0} / {config.required_E_coverage || 0}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={row.check.details?.N8?.met === false ? 'text-danger font-bold' : ''}>
-                        {row.coverage.N8 || 0} / {config.required_N8_coverage || 0}
-                      </span>
-                    </td>
+                    {(() => {
+                      const mode = config.shift_mode || '8HR';
+                      let coverageShifts = [];
+                      if (mode === '8HR' || mode === 'MIXED') coverageShifts.push('M', 'E', 'N8');
+                      if (mode === '12HR' || mode === 'MIXED') coverageShifts.push('D', 'N12');
+                      return coverageShifts;
+                    })().map(code => (
+                      <td key={code}>
+                        <span className={row.check.details?.[code]?.met === false ? 'text-danger font-bold' : ''}>
+                          {row.coverage[code] || 0} / {config[`required_${code}_coverage`] || 0}
+                        </span>
+                      </td>
+                    ))}
                     <td>
                       {row.check.met ? (
                         <span className="badge badge-success">✅ ครบ</span>

@@ -161,7 +161,7 @@ export default function MonthlyRosterPage() {
           <span className="text-muted font-bold">ประเภทเวร:</span>
           {activeShifts.map(st => (
             <span key={st.code} className={`badge badge-${st.code}`}>
-              {st.code} ({st.hours > 0 ? `${st.start}-${st.end}` : 'หยุด'})
+              {st.code} ({st.hours > 0 ? `${st.start}-${st.end}` : st.name.split(' (')[0]})
             </span>
           ))}
           <span style={{ marginLeft: 'auto', borderLeft: '1px solid var(--border-color)', paddingLeft: 16 }}>
@@ -274,7 +274,13 @@ export default function MonthlyRosterPage() {
               })}
 
               {/* Coverage Rows */}
-              {['M', 'E', 'N8'].map(shiftCode => {
+              {(() => {
+                const mode = config.shift_mode || '8HR';
+                let coverageShifts = [];
+                if (mode === '8HR' || mode === 'MIXED') coverageShifts.push('M', 'E', 'N8');
+                if (mode === '12HR' || mode === 'MIXED') coverageShifts.push('D', 'N12');
+                return coverageShifts;
+              })().map(shiftCode => {
                 if (!shiftTypesMap[shiftCode]?.active) return null;
                 const required = config[`required_${shiftCode}_coverage`] || 0;
                 return (
