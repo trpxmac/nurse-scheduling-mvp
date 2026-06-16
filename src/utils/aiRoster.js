@@ -241,6 +241,47 @@ function isAssignmentValid(roster, staff, day, shiftCode, shiftTypesMap, config,
     }
   }
 
+  // Check consecutive workdays
+  if (config.max_consecutive_workdays) {
+    let streak = 0;
+    for (let d = day - 1; d >= 1; d--) {
+      const prev = staffRoster[d];
+      if (prev && prev !== 'OFF') {
+        const st = shiftTypesMap[prev];
+        if (st && st.category !== 'OFF' && st.category !== 'LEAVE') {
+          streak++;
+        } else {
+          break;
+        }
+      } else {
+        break;
+      }
+    }
+    if (streak >= config.max_consecutive_workdays) return false;
+  }
+
+  // Check consecutive nights
+  if (config.max_consecutive_nights) {
+    const st = shiftTypesMap[shiftCode];
+    if (st && st.category === 'NIGHT') {
+      let streak = 0;
+      for (let d = day - 1; d >= 1; d--) {
+        const prev = staffRoster[d];
+        if (prev && prev !== 'OFF') {
+          const prevSt = shiftTypesMap[prev];
+          if (prevSt && prevSt.category === 'NIGHT') {
+            streak++;
+          } else {
+            break;
+          }
+        } else {
+          break;
+        }
+      }
+      if (streak >= config.max_consecutive_nights) return false;
+    }
+  }
+
   // Check daily hours limit
   const shiftHours = getShiftHours(shiftCode, shiftTypesMap);
   if (shiftHours > config.max_daily_hours) return false;
