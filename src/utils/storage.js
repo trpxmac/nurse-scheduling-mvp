@@ -201,10 +201,10 @@ export function saveMonthlySettings(month, settings) {
 
 export function loadShiftTypes() {
   const loaded = loadData(getScopedKey(SCOPED_KEYS.SHIFT_TYPES), DEFAULT_SHIFT_TYPES);
-  // Migration: force H to be LEAVE category if it's currently OFF
+  // Migration: force H to be LEAVE category
   let needsSave = false;
   const hShift = loaded.find(s => s.code === 'H');
-  if (hShift && hShift.category === 'OFF') {
+  if (hShift && hShift.category !== 'LEAVE') {
     hShift.category = 'LEAVE';
     needsSave = true;
   }
