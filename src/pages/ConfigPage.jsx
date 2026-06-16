@@ -177,7 +177,7 @@ export default function ConfigPage() {
             <span className="form-hint">กำหนดเป้าหมายชั่วโมงทำงานของเดือน <strong>{config.month && getMonthName(config.month)}</strong> — นำไปคำนวณ OT รวมท้ายเดือน</span>
           </div>
           <div className="form-group">
-            <label className="form-label">ชั่วโมงวันหยุดนักขัตฤกษ์ (Holiday Hours) <code>holiday_hours</code></label>
+            <label className="form-label">ชั่วโมงวันหยุด (Holiday Hours) <code>holiday_hours</code></label>
             <input
               className="form-input"
               type="text"
@@ -185,7 +185,7 @@ export default function ConfigPage() {
               onChange={(e) => handleMonthlyChange('holiday_hours', e.target.value)}
               placeholder="เว้นว่างเพื่อแสดงเป็นเส้นประ"
             />
-            <span className="form-hint">จำนวนชั่วโมงหยุดนักขัตฤกษ์ของเดือน <strong>{config.month && getMonthName(config.month)}</strong> — ระบบจะนำไปสุ่มสร้างเวร H ให้พยาบาลคนละ <strong>{config.holiday_hours ? Math.floor(Number(config.holiday_hours)/8) : 0}</strong> วันตอนกด Gen ตาราง</span>
+            <span className="form-hint">จำนวนชั่วโมงหยุดของเดือน <strong>{config.month && getMonthName(config.month)}</strong> — ระบบจะนำไปสุ่มสร้างเวร H ให้พยาบาลคนละ <strong>{config.holiday_hours ? Math.floor(Number(config.holiday_hours)/8) : 0}</strong> วันตอนกด Gen ตาราง</span>
           </div>
         </div>
       </div>

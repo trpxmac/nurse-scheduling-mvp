@@ -238,7 +238,7 @@ export default function ResultsPage() {
           <p>{getMonthName(viewMonth)} — {config.unit_name || config.hospital_name}</p>
           <div style={{ marginTop: '8px', display: 'flex', gap: '16px', fontSize: '0.9rem', color: 'var(--color-text-muted)' }}>
             <span><strong>เป้าหมาย (Roster Hours):</strong> {monthlySettings.roster_hours || '-'} ชม.</span>
-            <span><strong>วันหยุดนักขัตฤกษ์ (Holiday Hours):</strong> {monthlySettings.holiday_hours || '-'} ชม.</span>
+            <span><strong>วันหยุด (Holiday Hours):</strong> {monthlySettings.holiday_hours || '-'} ชม.</span>
           </div>
         </div>
         <div className="page-header-actions">
