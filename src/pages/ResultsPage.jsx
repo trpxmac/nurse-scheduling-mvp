@@ -74,10 +74,10 @@ export default function ResultsPage() {
          sh += getShiftHours(shift, shiftTypesMap);
          manualOt += ot;
       }
-      const finalOt = targetHrs > 0 ? Math.max(0, sh - targetHrs) : manualOt;
+      const finalOt = targetHrs > 0 ? Math.max(0, (sh + manualOt) - targetHrs) : manualOt;
       totalShiftHours += sh;
       totalOTHours += finalOt;
-      return sh + finalOt;
+      return sh + manualOt;
     });
     const totalHours = totalShiftHours + totalOTHours;
     const avgHours = hours.length > 0 ? Math.round(totalHours / hours.length) : 0;
@@ -106,12 +106,12 @@ export default function ResultsPage() {
          shiftHours += getShiftHours(shift, shiftTypesMap);
          manualOt += ot;
       }
-      const finalOt = targetHrs > 0 ? Math.max(0, shiftHours - targetHrs) : manualOt;
+      const finalOt = targetHrs > 0 ? Math.max(0, (shiftHours + manualOt) - targetHrs) : manualOt;
       return {
         name: s.nickname || s.firstName,
         shiftHours,
         otHours: finalOt,
-        total: shiftHours + finalOt
+        total: shiftHours + manualOt
       };
     });
   }, [activeStaff, roster, shiftTypesMap, monthlySettings]);
@@ -215,8 +215,8 @@ export default function ResultsPage() {
         if (stHours > 0) totalWorkingShifts++;
       }
       
-      const finalOt = targetHrs > 0 ? Math.max(0, totalShiftHours - targetHrs) : manualOt;
-      const totalHours = totalShiftHours + finalOt;
+      const finalOt = targetHrs > 0 ? Math.max(0, (totalShiftHours + manualOt) - targetHrs) : manualOt;
+      const totalHours = totalShiftHours + manualOt;
       
       return { staff: s, counts, totalHours, totalShiftHours, totalOTHours: finalOt, totalWorkingShifts, targetHrs };
     });
@@ -417,7 +417,7 @@ export default function ResultsPage() {
                       {row.targetHrs > 0 ? row.targetHrs : '-'}
                     </td>
                     <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--color-primary-dark)' }}>
-                      {row.totalShiftHours}
+                      {row.totalHours - row.totalOTHours}
                     </td>
                     <td style={{ textAlign: 'center', fontWeight: 700, color: row.totalOTHours > 0 ? 'var(--color-danger)' : 'var(--color-text-muted)' }}>
                       {row.totalOTHours > 0 ? `+${row.totalOTHours}` : '0'}
