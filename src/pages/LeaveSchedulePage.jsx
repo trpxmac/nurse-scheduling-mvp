@@ -89,18 +89,39 @@ export default function LeaveSchedulePage() {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
     const current = cellMap[staffId]?.[day] || '';
-    setPopup({ staffId, day, current, x: rect.left, y: rect.bottom + 4 });
+    // Find existing span end for this code
+    let existingEndDay = day;
+    if (current) {
+      let d = day + 1;
+      while (d <= daysInMonth && cellMap[staffId]?.[d] === current) {
+        existingEndDay = d;
+        d++;
+      }
+    }
+    setPopup({
+      staffId, day, current, endDay: existingEndDay,
+      x: rect.left, y: rect.bottom + 4
+    });
   };
 
-  const handleSelectShift = (shiftCode) => {
+  const handleSelectShift = (shiftCode, endDay) => {
     if (!popup) return;
     const { staffId, day } = popup;
+    const until = endDay !== undefined ? endDay : popup.endDay;
     setCellMap(prev => {
       const staffDays = { ...(prev[staffId] || {}) };
       if (shiftCode === '') {
-        delete staffDays[day];
+        // Clear entire existing span starting at day
+        const code = staffDays[day];
+        for (let d = day; d <= daysInMonth; d++) {
+          if (staffDays[d] === code) delete staffDays[d];
+          else break;
+        }
       } else {
-        staffDays[day] = shiftCode;
+        // Fill range from day to until
+        for (let d = day; d <= until; d++) {
+          staffDays[d] = shiftCode;
+        }
       }
       if (Object.keys(staffDays).length === 0) {
         const next = { ...prev };
@@ -372,39 +393,65 @@ export default function LeaveSchedulePage() {
             onClick={e => e.stopPropagation()}
             style={{
               position: 'fixed',
-              top: Math.min(popup.y, window.innerHeight - 260),
-              left: Math.min(popup.x, window.innerWidth - 220),
+              top: Math.min(popup.y, window.innerHeight - 340),
+              left: Math.min(popup.x, window.innerWidth - 260),
               zIndex: 999,
               background: 'var(--color-bg-primary)',
               border: '1px solid var(--border-color)',
               borderRadius: 10,
               boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-              padding: 10,
-              minWidth: 200,
+              padding: 12,
+              minWidth: 240,
             }}
           >
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 8, paddingBottom: 6, borderBottom: '1px solid var(--border-color-light)' }}>
-              วันที่ {popup.day} — เลือกประเภท
+            {/* Header */}
+            <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid var(--border-color-light)' }}>
+              📅 วันที่ {popup.day} — กำหนดช่วงลา
             </div>
+
+            {/* End day range */}
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginBottom: 4 }}>ช่วงวันที่ลา</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>วันที่ {popup.day}</span>
+                <span style={{ color: 'var(--color-text-muted)' }}>ถึง</span>
+                <select
+                  className="form-select"
+                  value={popup.endDay}
+                  onChange={e => setPopup(prev => ({ ...prev, endDay: Number(e.target.value) }))}
+                  style={{ flex: 1, fontSize: '0.82rem', padding: '4px 8px', height: 32 }}
+                >
+                  {Array.from({ length: daysInMonth - popup.day + 1 }, (_, i) => popup.day + i).map(d => (
+                    <option key={d} value={d}>วันที่ {d}{d === popup.day ? ' (วันเดียว)' : ''}</option>
+                  ))}
+                </select>
+              </div>
+              {popup.endDay > popup.day && (
+                <div style={{ fontSize: '0.72rem', color: 'var(--color-accent)', marginTop: 4 }}>
+                  รวม {popup.endDay - popup.day + 1} วัน
+                </div>
+              )}
+            </div>
+
+            {/* Leave type buttons */}
+            <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginBottom: 6 }}>เลือกประเภท แล้วกดเพื่อยืนยัน</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {leaveShifts.map(s => (
                 <button
                   key={s.code}
-                  onClick={() => handleSelectShift(s.code)}
+                  onClick={() => handleSelectShift(s.code, popup.endDay)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '7px 10px',
+                    padding: '8px 10px',
                     borderRadius: 6,
-                    border: popup.current === s.code ? '2px solid var(--color-primary)' : '1px solid transparent',
-                    background: popup.current === s.code ? 'rgba(59,130,246,0.1)' : 'transparent',
+                    border: popup.current === s.code ? '2px solid var(--color-primary)' : '1px solid var(--border-color-light)',
+                    background: popup.current === s.code ? 'rgba(59,130,246,0.1)' : 'var(--color-bg-secondary)',
                     cursor: 'pointer', textAlign: 'left',
                     fontWeight: popup.current === s.code ? 700 : 400,
                     fontSize: '0.82rem',
                     color: 'var(--color-text-primary)',
                     transition: 'background 0.15s',
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg-secondary)'}
-                  onMouseLeave={e => e.currentTarget.style.background = popup.current === s.code ? 'rgba(59,130,246,0.1)' : 'transparent'}
                 >
                   <span style={{
                     display: 'inline-block',
@@ -418,6 +465,7 @@ export default function LeaveSchedulePage() {
                     textAlign: 'center',
                   }}>{s.code}</span>
                   <span>{s.name.split(' (')[0]}</span>
+                  {popup.current === s.code && <span style={{ marginLeft: 'auto', fontSize: '0.68rem', color: 'var(--color-primary)' }}>✓ ปัจจุบัน</span>}
                 </button>
               ))}
               {popup.current && (
@@ -435,7 +483,7 @@ export default function LeaveSchedulePage() {
                     marginTop: 4,
                   }}
                 >
-                  <X size={14} /> ล้าง (ยกเลิกวันลานี้)
+                  <X size={14} /> ล้างช่วงวันลานี้ทั้งหมด
                 </button>
               )}
             </div>
