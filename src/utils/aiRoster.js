@@ -244,7 +244,7 @@ function isAssignmentValid(roster, staff, day, shiftCode, shiftTypesMap, config,
   // Check previous day for Quick Return
   if (day > 1) {
     const prevShift = staffRoster[day - 1];
-    if (prevShift && prevShift !== 'OFF') {
+    if (prevShift && prevShift !== '-') {
       const prevType = shiftTypesMap[prevShift];
       const currType = shiftTypesMap[shiftCode];
       if (prevType && currType) {
@@ -256,7 +256,7 @@ function isAssignmentValid(roster, staff, day, shiftCode, shiftTypesMap, config,
 
   // Check if next day assignment would be violated
   const nextShift = staffRoster[day + 1];
-  if (nextShift && nextShift !== 'OFF') {
+  if (nextShift && nextShift !== '-') {
     const currType = shiftTypesMap[shiftCode];
     const nextType = shiftTypesMap[nextShift];
     if (currType && nextType) {
@@ -270,7 +270,7 @@ function isAssignmentValid(roster, staff, day, shiftCode, shiftTypesMap, config,
     let streak = 0;
     for (let d = day - 1; d >= 1; d--) {
       const prev = staffRoster[d];
-      if (prev && prev !== 'OFF') {
+      if (prev && prev !== '-') {
         const st = shiftTypesMap[prev];
         if (st && st.category !== 'OFF' && st.category !== 'LEAVE') {
           streak++;
@@ -291,7 +291,7 @@ function isAssignmentValid(roster, staff, day, shiftCode, shiftTypesMap, config,
       let streak = 0;
       for (let d = day - 1; d >= 1; d--) {
         const prev = staffRoster[d];
-        if (prev && prev !== 'OFF') {
+        if (prev && prev !== '-') {
           const prevSt = shiftTypesMap[prev];
           if (prevSt && prevSt.category === 'NIGHT') {
             streak++;
