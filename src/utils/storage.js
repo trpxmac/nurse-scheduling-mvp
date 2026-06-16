@@ -65,7 +65,10 @@ export const DEFAULT_SHIFT_TYPES = [
   { id: 'N12', code: 'N12', name: 'กลางคืน 12 ชม. (Night 12hr)', start: '19:00', end: '07:00', hours: 12, category: 'NIGHT', active: true,  hex: '#E6E6FA' },
 
   // ── OFF (no hours counted)
-  { id: 'OFF', code: 'OFF', name: 'วันหยุด (Day Off)',         start: '',      end: '',      hours: 0,  category: 'OFF',   active: true,  hex: '#F5F5F5' },
+  { id: '-', code: '-', name: 'วันหยุด/พัก (Rest)',         start: '',      end: '',      hours: 0,  category: 'OFF',   active: true,  hex: '#F5F5F5' },
+
+  // ── HOLIDAY
+  { id: 'H', code: 'H', name: 'วันหยุดนักขัตฤกษ์ (Holiday)', start: '',      end: '',      hours: 8,  category: 'OFF', active: true,  hex: '#DDA0DD' },
 
   // ── LEAVE (no work hours, leave tracking)
   { id: 'AL',  code: 'AL',  name: 'ลาพักร้อน (Annual Leave)', start: '',      end: '',      hours: 0,  category: 'LEAVE', active: true,  hex: '#FFD700' },

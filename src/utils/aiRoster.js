@@ -19,7 +19,7 @@ export function isSenior(staff) {
  */
 export function generateAIRoster(staffList, shiftTypes, config, lockedSlots = {}) {
   const activeStaff = staffList.filter(s => s.active);
-  const activeShifts = shiftTypes.filter(s => s.active && s.code !== 'OFF');
+  const activeShifts = shiftTypes.filter(s => s.active && s.code !== '-');
   const shiftTypesMap = buildShiftTypesMap(shiftTypes);
 
   if (activeStaff.length === 0 || activeShifts.length === 0) {
@@ -48,6 +48,25 @@ export function generateAIRoster(staffList, shiftTypes, config, lockedSlots = {}
     if (lockedSlots[staff.id]) {
       for (const [day, shiftCode] of Object.entries(lockedSlots[staff.id])) {
         roster[staff.id][Number(day)] = shiftCode;
+      }
+    }
+  }
+
+  // Pre-fill Holiday (H) shifts if holiday_hours are defined
+  const hasHolidayShift = shiftTypesMap['H'] && shiftTypesMap['H'].active;
+  const holidayHours = Number(config.holiday_hours) || 0;
+  const numHolidayShifts = Math.floor(holidayHours / (shiftTypesMap['H']?.hours || 8));
+
+  if (hasHolidayShift && numHolidayShifts > 0) {
+    for (const staff of activeStaff) {
+      let hCount = 0;
+      // Pre-fill randomly to empty slots
+      const emptyDays = Array.from({length: daysInMonth}, (_, i) => i + 1)
+                             .filter(d => roster[staff.id][d] === undefined);
+      shuffleArray(emptyDays);
+      for (let i = 0; i < emptyDays.length && hCount < numHolidayShifts; i++) {
+        roster[staff.id][emptyDays[i]] = 'H';
+        hCount++;
       }
     }
   }
@@ -96,12 +115,12 @@ export function generateAIRoster(staffList, shiftTypes, config, lockedSlots = {}
       const targetWorkHours = Number(config.roster_hours) || ((config.max_weekly_hours || 48) * (daysInMonth / 7));
 
       if (currentHours >= targetWorkHours) {
-        roster[staff.id][day] = 'OFF';
+        roster[staff.id][day] = '-';
         continue;
       }
 
       // Find a suitable shift
-      const availableShifts = workShifts.filter(s => s.code !== 'OFF');
+      const availableShifts = workShifts.filter(s => s.code !== '-');
       if (availableShifts.length > 0) {
         // Pick the shift this staff has done the least, then by least coverage
         availableShifts.sort((a, b) => {
@@ -121,10 +140,10 @@ export function generateAIRoster(staffList, shiftTypes, config, lockedSlots = {}
           dayAssignments[staff.id] = chosen.code;
           dayCoverage[chosen.code] = (dayCoverage[chosen.code] || 0) + 1;
         } else {
-          roster[staff.id][day] = 'OFF';
+          roster[staff.id][day] = '-';
         }
       } else {
-        roster[staff.id][day] = 'OFF';
+        roster[staff.id][day] = '-';
       }
     }
   }
@@ -350,14 +369,14 @@ function ensureRestDays(staffRoster, daysInMonth) {
   for (let d = 1; d <= daysInMonth - 6; d++) {
     let consecutive = 0;
     for (let i = 0; i < 7; i++) {
-      if (staffRoster[d + i] && staffRoster[d + i] !== 'OFF') {
+      if (staffRoster[d + i] && staffRoster[d + i] !== '-') {
         consecutive++;
       }
     }
     if (consecutive >= 7) {
       // Force one day off in the middle
       const midDay = d + 3;
-      staffRoster[midDay] = 'OFF';
+      staffRoster[midDay] = '-';
     }
   }
 }
@@ -389,7 +408,7 @@ function calculateAIScore(roster, staff, shiftTypesMap, config, daysInMonth, wor
     const dayCoverage = {};
     for (const s of staff) {
       const shift = roster[s.id]?.[day];
-      if (shift && shift !== 'OFF') {
+      if (shift && shift !== '-') {
         dayCoverage[shift] = (dayCoverage[shift] || 0) + 1;
       }
     }
@@ -418,7 +437,7 @@ function generateSummary(roster, staff, shiftTypesMap, config, daysInMonth, work
     const dayCoverage = {};
     for (const s of staff) {
       const shift = roster[s.id]?.[day];
-      if (shift && shift !== 'OFF') {
+      if (shift && shift !== '-') {
         dayCoverage[shift] = (dayCoverage[shift] || 0) + 1;
       }
     }

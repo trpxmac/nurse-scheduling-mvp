@@ -185,7 +185,7 @@ export default function ConfigPage() {
               onChange={(e) => handleMonthlyChange('holiday_hours', e.target.value)}
               placeholder="เว้นว่างเพื่อแสดงเป็นเส้นประ"
             />
-            <span className="form-hint">จำนวนชั่วโมงหยุดนักขัตฤกษ์ของเดือน <strong>{config.month && getMonthName(config.month)}</strong></span>
+            <span className="form-hint">จำนวนชั่วโมงหยุดนักขัตฤกษ์ของเดือน <strong>{config.month && getMonthName(config.month)}</strong> — ระบบจะนำไปสุ่มสร้างเวร H ให้พยาบาลคนละ <strong>{config.holiday_hours ? Math.floor(Number(config.holiday_hours)/8) : 0}</strong> วันตอนกด Gen ตาราง</span>
           </div>
         </div>
       </div>
