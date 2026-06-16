@@ -64,6 +64,8 @@
   --shift-OFF: #475569;
   --shift-OFF-bg: rgba(71, 85, 105, 0.15);
   --shift-OFF-text: #94a3b8;
+  --shift-H-bg: rgba(221, 160, 221, 0.18);
+  --shift-H-text: #dda0dd;
 
   /* Leave & Other shift colors (from spec) */
   --shift-AL-bg: rgba(255, 215, 0, 0.18);
@@ -485,7 +487,9 @@ a:hover {
 .badge-N8 { background: var(--shift-N8-bg); color: var(--shift-N8-text); border: 1px solid rgba(99,102,241,0.25); }
 .badge-D { background: var(--shift-D-bg); color: var(--shift-D-text); border: 1px solid rgba(16,185,129,0.25); }
 .badge-N12 { background: var(--shift-N12-bg); color: var(--shift-N12-text); border: 1px solid rgba(168,85,247,0.25); }
+.badge-\- { background: var(--shift-OFF-bg); color: var(--shift-OFF-text); border: 1px solid rgba(71,85,105,0.25); }
 .badge-OFF { background: var(--shift-OFF-bg); color: var(--shift-OFF-text); border: 1px solid rgba(71,85,105,0.25); }
+.badge-H  { background: var(--shift-H-bg);  color: var(--shift-H-text);  border: 1px solid rgba(221,160,221,0.25); }
 .badge-AL  { background: var(--shift-AL-bg);  color: var(--shift-AL-text);  border: 1px solid rgba(255,215,0,0.25); }
 .badge-SL  { background: var(--shift-SL-bg);  color: var(--shift-SL-text);  border: 1px solid rgba(255,160,122,0.25); }
 .badge-TRN { background: var(--shift-TRN-bg); color: var(--shift-TRN-text); border: 1px solid rgba(173,216,230,0.25); }
@@ -824,7 +828,9 @@ a:hover {
 .shift-N8 { background: var(--shift-N8-bg); color: var(--shift-N8-text); }
 .shift-D { background: var(--shift-D-bg); color: var(--shift-D-text); }
 .shift-N12 { background: var(--shift-N12-bg); color: var(--shift-N12-text); }
+.shift-\- { background: var(--shift-OFF-bg); color: var(--shift-OFF-text); }
 .shift-OFF { background: var(--shift-OFF-bg); color: var(--shift-OFF-text); }
+.shift-H { background: var(--shift-H-bg); color: var(--shift-H-text); }
 .shift-AL { background: var(--shift-AL-bg); color: var(--shift-AL-text); }
 .shift-SL { background: var(--shift-SL-bg); color: var(--shift-SL-text); }
 .shift-TRN { background: var(--shift-TRN-bg); color: var(--shift-TRN-text); }
