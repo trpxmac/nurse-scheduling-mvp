@@ -390,7 +390,6 @@ export default function ResultsPage() {
                     </th>
                   ))}
                   <th style={{ borderLeft: '1px solid var(--border-color)', textAlign: 'center' }}>รวมเวรทำงาน (วัน)</th>
-                  <th style={{ textAlign: 'center' }}>เป้าหมาย (ชม.)</th>
                   <th style={{ textAlign: 'center' }}>ชั่วโมงทำจริงรวม (ชม.)</th>
                   <th style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>ชม. OT</th>
                 </tr>
@@ -414,9 +413,6 @@ export default function ResultsPage() {
                     ))}
                     <td style={{ textAlign: 'center', fontWeight: 600, borderLeft: '1px solid var(--border-color)' }}>
                       {row.totalWorkingShifts}
-                    </td>
-                    <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--color-text-muted)' }}>
-                      {row.targetHrs > 0 ? row.targetHrs : '-'}
                     </td>
                     <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--color-primary-dark)', background: 'rgba(59,130,246,0.05)' }}>
                       {row.totalHours}
