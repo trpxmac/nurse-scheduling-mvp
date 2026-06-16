@@ -85,19 +85,17 @@ export function generateAIRoster(staffList, shiftTypes, config, lockedSlots = {}
     }
 
     // Phase 2: Assign remaining staff (some work, some OFF)
+    // To balance hours, sort remaining staff by current total hours (ascending)
+    staffPool.sort((a, b) => {
+      return calcCurrentHours(roster[a.id], shiftTypesMap) - calcCurrentHours(roster[b.id], shiftTypesMap);
+    });
+
     for (const staff of staffPool) {
-      // Check if staff has reached maximum allowed hours for the month
+      // Target work hours is ideally roster_hours or max allowed
       const currentHours = calcCurrentHours(roster[staff.id], shiftTypesMap);
-      const targetWorkHours = (config.max_weekly_hours || 48) * (daysInMonth / 7);
+      const targetWorkHours = Number(config.roster_hours) || ((config.max_weekly_hours || 48) * (daysInMonth / 7));
 
       if (currentHours >= targetWorkHours) {
-        roster[staff.id][day] = 'OFF';
-        continue;
-      }
-
-      // Determine probability of OFF (increase as we approach target)
-      const ratio = currentHours / targetWorkHours;
-      if (Math.random() < ratio * 0.3) {
         roster[staff.id][day] = 'OFF';
         continue;
       }
@@ -159,14 +157,13 @@ function findBestStaff(pool, roster, shiftCode, day, shiftTypesMap, config, days
       continue;
     }
 
-    // Score: prefer staff with fewer hours
+    // Score: prefer staff with fewer hours heavily to balance OT
     const currentHours = calcCurrentHours(roster[staff.id], shiftTypesMap);
-    let score = 1000 - currentHours;
+    let score = 10000 - (currentHours * 10);
 
-    // Penalize heavily if the staff already has this specific shift
-    // Penalty is 500 per shift so that shift type balancing is strictly prioritized over total hours (max 240 difference)
+    // Penalize if the staff already has this specific shift (secondary priority)
     const currentShiftCount = Object.values(roster[staff.id]).filter(v => v === shiftCode).length;
-    score -= (currentShiftCount * 500);
+    score -= (currentShiftCount * 30);
 
     // Rule: Prioritize seniors if the shift doesn't have one yet
     if (!hasSenior && isSenior(staff)) {
