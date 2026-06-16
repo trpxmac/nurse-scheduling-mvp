@@ -208,6 +208,19 @@ export function buildShiftTypesMap(shiftTypes) {
 }
 
 /**
+ * Filter active shifts based on shift_mode
+ */
+export function filterActiveShifts(shiftTypes, shiftMode) {
+  let filtered = shiftTypes.filter(s => s.active);
+  if (shiftMode === '8HR') {
+    filtered = filtered.filter(s => s.hours === 8 || s.hours === 0);
+  } else if (shiftMode === '12HR') {
+    filtered = filtered.filter(s => s.hours === 12 || s.hours === 0);
+  }
+  return filtered;
+}
+
+/**
  * Count all violations for summary
  */
 export function countViolations(roster, staffList, shiftTypesMap, config, yearMonth) {

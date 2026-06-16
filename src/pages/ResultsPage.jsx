@@ -13,7 +13,7 @@ import MonthSelector from '../components/MonthSelector';
 import {
   buildShiftTypesMap, calcMonthlyHours, calcWeeklyHours,
   detectQuickReturns, calcDailyCoverage, checkCoverageRequirements,
-  countViolations, buildStaffValidation, parseShift, getShiftHours
+  countViolations, buildStaffValidation, parseShift, getShiftHours, filterActiveShifts
 } from '../utils/scheduling';
 import StatCard from '../components/StatCard';
 import ShiftBadge from '../components/ShiftBadge';
@@ -52,7 +52,7 @@ export default function ResultsPage() {
   }, [viewMonth]);
 
   const activeStaff = useMemo(() => staffList.filter(s => s.active), [staffList]);
-  const activeShifts = useMemo(() => shiftTypes.filter(s => s.active), [shiftTypes]);
+  const activeShifts = useMemo(() => filterActiveShifts(shiftTypes, config.shift_mode), [shiftTypes, config.shift_mode]);
   const shiftTypesMap = useMemo(() => buildShiftTypesMap(shiftTypes), [shiftTypes]);
   const daysInMonth = useMemo(() => getDaysInMonth(viewMonth), [viewMonth]);
   const days = useMemo(() => Array.from({ length: daysInMonth }, (_, i) => i + 1), [daysInMonth]);

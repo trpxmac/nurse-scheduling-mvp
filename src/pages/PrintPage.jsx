@@ -4,13 +4,13 @@ import {
   loadConfig, loadShiftTypes, loadStaffList, loadMonthlyRoster,
   getDaysInMonth, getMonthName, getDayOfWeek, isWeekend
 } from '../utils/storage';
-import { buildShiftTypesMap, calcMonthlyHours, parseShift } from '../utils/scheduling';
+import { buildShiftTypesMap, calcMonthlyHours, parseShift, filterActiveShifts } from '../utils/scheduling';
 import './PrintPage.css';
 
 export default function PrintPage() {
   const [config, setConfig] = useState({});
   const [shiftTypes, setShiftTypes] = useState([]);
-  const activeShiftTypes = useMemo(() => shiftTypes.filter(s => s.active), [shiftTypes]);
+  const activeShiftTypes = useMemo(() => filterActiveShifts(shiftTypes, config.shift_mode), [shiftTypes, config.shift_mode]);
   const [staffList, setStaffList] = useState([]);
   const [roster, setRoster] = useState({});
 

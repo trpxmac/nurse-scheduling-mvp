@@ -12,7 +12,7 @@ import CustomDialog from '../components/CustomDialog';
 import {
   buildShiftTypesMap, calcMonthlyHours, detectQuickReturns,
   calcDailyCoverage, checkCoverageRequirements, parseShift,
-  getShiftHours
+  getShiftHours, filterActiveShifts
 } from '../utils/scheduling';
 
 export default function MonthlyRosterPage() {
@@ -50,7 +50,7 @@ export default function MonthlyRosterPage() {
   }, [viewMonth]);
 
   const activeStaff = useMemo(() => staffList.filter(s => s.active), [staffList]);
-  const activeShifts = useMemo(() => shiftTypes.filter(s => s.active), [shiftTypes]);
+  const activeShifts = useMemo(() => filterActiveShifts(shiftTypes, config.shift_mode), [shiftTypes, config.shift_mode]);
   const shiftTypesMap = useMemo(() => buildShiftTypesMap(shiftTypes), [shiftTypes]);
   const daysInMonth = useMemo(() => getDaysInMonth(viewMonth), [viewMonth]);
   const days = useMemo(() => Array.from({ length: daysInMonth }, (_, i) => i + 1), [daysInMonth]);
