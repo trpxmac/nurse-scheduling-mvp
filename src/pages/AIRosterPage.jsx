@@ -5,7 +5,7 @@ import {
   loadConfig, loadShiftTypes, loadStaffList,
   loadMonthlyRoster, saveMonthlyRoster, saveAIRoster,
   getDaysInMonth, getDayOfWeek, isWeekend, getMonthName,
-  loadActiveMonth, saveActiveMonth,
+  loadActiveMonth, saveActiveMonth, loadLeaveSchedules,
 } from '../utils/storage';
 import MonthSelector from '../components/MonthSelector';
 import { buildShiftTypesMap, calcMonthlyHours } from '../utils/scheduling';
@@ -47,7 +47,16 @@ export default function AIRosterPage() {
     // Use setTimeout to show loading state
     setTimeout(() => {
       const aiConfig = { ...config, month: viewMonth };
-      const res = generateAIRoster(staffList, shiftTypes, aiConfig);
+      // Load pre-set leave schedules and build locked slots map
+      const leaveSchedules = loadLeaveSchedules(viewMonth);
+      const lockedSlots = {}; // { [staffId]: { [day]: shiftCode } }
+      for (const sch of leaveSchedules) {
+        if (!lockedSlots[sch.staffId]) lockedSlots[sch.staffId] = {};
+        for (let d = sch.startDay; d <= sch.endDay; d++) {
+          lockedSlots[sch.staffId][d] = sch.shiftCode;
+        }
+      }
+      const res = generateAIRoster(staffList, shiftTypes, aiConfig, lockedSlots);
       setResult(res);
       saveAIRoster(res);
       setGenerating(false);

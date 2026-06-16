@@ -15,6 +15,7 @@ const SCOPED_KEYS = {
   STAFF_LIST: `${STORAGE_PREFIX}staff_list`,
   MONTHLY_ROSTER: `${STORAGE_PREFIX}monthly_roster`,
   AI_ROSTER: `${STORAGE_PREFIX}ai_roster`,
+  LEAVE_SCHEDULES: `${STORAGE_PREFIX}leave_schedules`,
 };
 // ---- Default Data ----
 
@@ -226,6 +227,19 @@ export function loadAIRoster() {
 
 export function saveAIRoster(roster) {
   return saveData(getScopedKey(SCOPED_KEYS.AI_ROSTER), roster);
+}
+
+// ---- Leave Schedules (Pre-set leaves per staff per month) ----
+// Structure: { [yearMonth]: [ { id, staffId, shiftCode, startDay, endDay, note } ] }
+
+export function loadLeaveSchedules(yearMonth) {
+  const key = `${getScopedKey(SCOPED_KEYS.LEAVE_SCHEDULES)}_${yearMonth}`;
+  return loadData(key, []);
+}
+
+export function saveLeaveSchedules(yearMonth, schedules) {
+  const key = `${getScopedKey(SCOPED_KEYS.LEAVE_SCHEDULES)}_${yearMonth}`;
+  return saveData(key, schedules);
 }
 
 // ---- Utilities ----

@@ -6,6 +6,7 @@ import StaffListPage from './pages/StaffListPage';
 import MonthlyRosterPage from './pages/MonthlyRosterPage';
 import ResultsPage from './pages/ResultsPage';
 import AIRosterPage from './pages/AIRosterPage';
+import LeaveSchedulePage from './pages/LeaveSchedulePage';
 import PrintPage from './pages/PrintPage';
 import './App.css';
 
@@ -36,6 +37,7 @@ export default function App() {
               <Route path="/roster" element={<MonthlyRosterPage />} />
               <Route path="/results" element={<ResultsPage />} />
               <Route path="/ai-roster" element={<AIRosterPage />} />
+              <Route path="/leave-schedule" element={<LeaveSchedulePage />} />
             </Routes>
           </AppLayout>
         } />

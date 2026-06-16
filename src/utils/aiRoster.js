@@ -17,7 +17,7 @@ export function isSenior(staff) {
  * @param {Object} config - Configuration with constraints
  * @returns {{ roster: Object, score: number, summary: Object }}
  */
-export function generateAIRoster(staffList, shiftTypes, config) {
+export function generateAIRoster(staffList, shiftTypes, config, lockedSlots = {}) {
   const activeStaff = staffList.filter(s => s.active);
   const activeShifts = shiftTypes.filter(s => s.active && s.code !== 'OFF');
   const shiftTypesMap = buildShiftTypesMap(shiftTypes);
@@ -40,14 +40,22 @@ export function generateAIRoster(staffList, shiftTypes, config) {
 
   if (workShifts.length === 0) workShifts = activeShifts.filter(s => s.hours > 0);
 
+  // Initialize roster and pre-fill with locked leave days
   const roster = {};
   for (const staff of activeStaff) {
     roster[staff.id] = {};
+    // Pre-fill locked slots (AL, SL, TRN, ML etc)
+    if (lockedSlots[staff.id]) {
+      for (const [day, shiftCode] of Object.entries(lockedSlots[staff.id])) {
+        roster[staff.id][Number(day)] = shiftCode;
+      }
+    }
   }
 
   // For each day, assign shifts to meet coverage
   for (let day = 1; day <= daysInMonth; day++) {
-    const staffPool = [...activeStaff];
+    // Only include staff that don't have a locked slot for this day
+    const staffPool = activeStaff.filter(s => roster[s.id][day] === undefined);
     shuffleArray(staffPool);
 
     // Track assignments for this day

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   Settings, Clock, Users, CalendarDays,
-  BarChart3, Sparkles, Building2, PlusCircle, Trash2
+  BarChart3, Sparkles, Building2, PlusCircle, Trash2, Plane
 } from 'lucide-react';
 import { loadDepartments, loadActiveDepartment, saveActiveDepartment, saveDepartments } from '../utils/storage';
 import CustomDialog from './CustomDialog';
@@ -19,14 +19,15 @@ const navItems = [
     section: 'จัดการ',
     items: [
       { to: '/staff', label: 'รายชื่อบุคลากร', icon: Users, step: 3 },
-      { to: '/roster', label: 'จัดตารางเวร', icon: CalendarDays, step: 4 },
+      { to: '/leave-schedule', label: 'กำหนดช่วงลา/อบรม', icon: Plane, step: 4 },
+      { to: '/roster', label: 'จัดตารางเวร', icon: CalendarDays, step: 5 },
     ]
   },
   {
     section: 'ผลลัพธ์',
     items: [
-      { to: '/results', label: 'ตรวจสอบผลลัพธ์', icon: BarChart3, step: 5 },
-      { to: '/ai-roster', label: 'จัดเวรอัตโนมัติ', icon: Sparkles, step: 6 },
+      { to: '/results', label: 'ตรวจสอบผลลัพธ์', icon: BarChart3, step: 6 },
+      { to: '/ai-roster', label: 'จัดเวรอัตโนมัติ', icon: Sparkles, step: 7 },
     ]
   }
 ];
