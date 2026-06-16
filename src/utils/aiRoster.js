@@ -109,12 +109,41 @@ export function generateAIRoster(staffList, shiftTypes, config, lockedSlots = {}
       return calcCurrentHours(roster[a.id], shiftTypesMap) - calcCurrentHours(roster[b.id], shiftTypesMap);
     });
 
+    const targetWorkHours = Number(config.roster_hours) || ((config.max_weekly_hours || 48) * (daysInMonth / 7));
+    
+    // Calculate how many EXTRA shifts we should assign today to keep an even pace
+    let totalMissingHours = 0;
+    for (const s of activeStaff) {
+      totalMissingHours += Math.max(0, targetWorkHours - calcCurrentHours(roster[s.id], shiftTypesMap));
+    }
+    const workingShifts = workShifts.filter(s => s.code !== '-');
+    let avgShiftHours = workingShifts.length > 0 
+      ? workingShifts.reduce((acc, s) => acc + (s.hours || 0), 0) / workingShifts.length 
+      : 12;
+    if (avgShiftHours === 0) avgShiftHours = 12;
+    
+    const remainingDays = daysInMonth - day + 1;
+    const neededShiftsPerDay = (totalMissingHours / avgShiftHours) / remainingDays;
+    
+    let dailyReq = 0;
+    for (const shift of workShifts) {
+      dailyReq += (config[`required_${shift.code}_coverage`] || 0);
+    }
+    
+    // Allow up to Math.ceil(needed - required) extra shifts today
+    const extraShiftsPerDay = Math.max(0, Math.ceil(neededShiftsPerDay - dailyReq));
+    let extraAssignedToday = 0;
+
     for (const staff of staffPool) {
       // Target work hours is ideally roster_hours or max allowed
       const currentHours = calcCurrentHours(roster[staff.id], shiftTypesMap);
-      const targetWorkHours = Number(config.roster_hours) || ((config.max_weekly_hours || 48) * (daysInMonth / 7));
 
       if (currentHours >= targetWorkHours) {
+        roster[staff.id][day] = '-';
+        continue;
+      }
+
+      if (extraAssignedToday >= extraShiftsPerDay) {
         roster[staff.id][day] = '-';
         continue;
       }
@@ -152,6 +181,8 @@ export function generateAIRoster(staffList, shiftTypes, config, lockedSlots = {}
         
         if (!assigned) {
           roster[staff.id][day] = '-';
+        } else {
+          extraAssignedToday++;
         }
       } else {
         roster[staff.id][day] = '-';
