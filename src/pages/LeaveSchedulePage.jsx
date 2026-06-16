@@ -237,48 +237,110 @@ export default function LeaveSchedulePage() {
                       {staff.level && staff.level !== '-' ? staff.level : staff.position}
                     </span>
                   </td>
-                  {/* Day cells */}
-                  {dayRange.map(d => {
-                    const shiftCode = cellMap[staff.id]?.[d] || '';
-                    const color = shiftCode ? getShiftColor(shiftCode) : undefined;
-                    return (
-                      <td key={d}
-                        onClick={(e) => handleCellClick(e, staff.id, d)}
-                        title={shiftCode ? `${staff.firstName} ${staff.lastName} — ${shiftCode} วันที่ ${d}` : `คลิกเพื่อกำหนดลา วันที่ ${d}`}
-                        style={{
-                          padding: '2px 1px',
-                          textAlign: 'center',
-                          borderBottom: '1px solid var(--border-color-light)',
-                          background: isWeekend(viewMonth, d) ? 'rgba(245,158,11,0.04)' : undefined,
-                          cursor: 'pointer',
-                          transition: 'background 0.1s',
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(59,130,246,0.12)'}
-                        onMouseLeave={e => e.currentTarget.style.background = isWeekend(viewMonth, d) ? 'rgba(245,158,11,0.04)' : ''}
-                      >
-                        {shiftCode ? (
-                          <div style={{
-                            background: color,
-                            borderRadius: 3,
-                            minWidth: 28,
-                            height: 26,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '0.62rem',
-                            fontWeight: 700,
-                            color: '#333',
-                            margin: '0 auto',
-                          }}>
-                            {shiftCode}
-                          </div>
-                        ) : (
-                          <div style={{ minWidth: 28, height: 26, margin: '0 auto' }} />
-                        )}
-                      </td>
-                    );
-                  })}
+                  {/* Day cells — group consecutive same-code days into a spanning bar */}
+                  {(() => {
+                    const cells = [];
+                    let d = 1;
+                    const staffDays = cellMap[staff.id] || {};
+                    while (d <= daysInMonth) {
+                      const shiftCode = staffDays[d] || '';
+                      if (shiftCode) {
+                        // Find how many consecutive days share the same code
+                        let span = 1;
+                        while (
+                          d + span <= daysInMonth &&
+                          staffDays[d + span] === shiftCode
+                        ) span++;
+                        const color = getShiftColor(shiftCode);
+                        const shiftObj = leaveShifts.find(s => s.code === shiftCode);
+                        const label = shiftObj ? shiftObj.name.split(' (')[0] : shiftCode;
+                        cells.push(
+                          <td
+                            key={d}
+                            colSpan={span}
+                            onClick={(e) => handleCellClick(e, staff.id, d)}
+                            title={`${staff.firstName} — ${label} วันที่ ${d}${span > 1 ? `–${d + span - 1}` : ''}`}
+                            style={{
+                              padding: '3px 0',
+                              cursor: 'pointer',
+                              borderBottom: '1px solid var(--border-color-light)',
+                            }}
+                          >
+                            <div style={{
+                              background: color,
+                              borderRadius: span === 1 ? 4 : 4,
+                              margin: '0 1px',
+                              height: 26,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: span > 2 ? 'center' : 'center',
+                              gap: 4,
+                              fontSize: span === 1 ? '0.62rem' : '0.72rem',
+                              fontWeight: 700,
+                              color: '#333',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              // Left and right rounded tips to look like a paper bar
+                              borderTopLeftRadius: 6,
+                              borderBottomLeftRadius: 6,
+                              borderTopRightRadius: 6,
+                              borderBottomRightRadius: 6,
+                              boxShadow: span > 1 ? `0 1px 4px ${color}88` : undefined,
+                              position: 'relative',
+                            }}>
+                              {/* Left marker line */}
+                              {span > 1 && (
+                                <span style={{
+                                  position: 'absolute', left: 4, top: '50%', transform: 'translateY(-50%)',
+                                  fontSize: '0.55rem', fontWeight: 900, color: '#33333399',
+                                }}>|</span>
+                              )}
+                              <span>{shiftCode}</span>
+                              {span > 2 && (
+                                <span style={{ fontSize: '0.6rem', fontWeight: 400, opacity: 0.8 }}>
+                                  {label}
+                                </span>
+                              )}
+                              {/* Right marker line */}
+                              {span > 1 && (
+                                <span style={{
+                                  position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)',
+                                  fontSize: '0.55rem', fontWeight: 900, color: '#33333399',
+                                }}>|</span>
+                              )}
+                            </div>
+                          </td>
+                        );
+                        d += span;
+                      } else {
+                        // Empty cell
+                        cells.push(
+                          <td
+                            key={d}
+                            onClick={(e) => handleCellClick(e, staff.id, d)}
+                            title={`คลิกเพื่อกำหนดลา วันที่ ${d}`}
+                            style={{
+                              padding: '2px 1px',
+                              textAlign: 'center',
+                              borderBottom: '1px solid var(--border-color-light)',
+                              background: isWeekend(viewMonth, d) ? 'rgba(245,158,11,0.04)' : undefined,
+                              cursor: 'pointer',
+                              minWidth: 32,
+                              transition: 'background 0.1s',
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(59,130,246,0.12)'}
+                            onMouseLeave={e => e.currentTarget.style.background = isWeekend(viewMonth, d) ? 'rgba(245,158,11,0.04)' : ''}
+                          >
+                            <div style={{ minWidth: 28, height: 26, margin: '0 auto' }} />
+                          </td>
+                        );
+                        d++;
+                      }
+                    }
+                    return cells;
+                  })()}
                 </tr>
+
               ))}
               {activeStaff.length === 0 && (
                 <tr>
