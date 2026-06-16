@@ -107,6 +107,9 @@ export default function PrintPage() {
             let totalRLV = 0;
             let totalADM = 0;
 
+            const reqHrs = Number(config.roster_hours) || 0;
+            const targetHrs = reqHrs;
+
             for (let d = 1; d <= daysInMonth; d++) {
               const { shift, ot, otType } = parseShift(staffRoster[d]);
               const st = shiftTypesMap[shift];
@@ -116,6 +119,9 @@ export default function PrintPage() {
               else if (otType === 'A') totalADM += ot;
               else totalOT += ot;
             }
+            
+            const finalOt = targetHrs > 0 ? Math.max(0, (totalHours + totalOT) - targetHrs) : totalOT;
+            const displayTotalHours = totalHours + totalOT;
 
             return (
               <tbody key={staff.id} style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
@@ -132,9 +138,9 @@ export default function PrintPage() {
                     const { shift } = parseShift(staffRoster[d]);
                     return <td key={d} className="text-center cell-shift">{shift}</td>;
                   })}
-                  <td rowSpan={2} className="text-center summary-val">{totalHours > 0 ? totalHours : ''}</td>
+                  <td rowSpan={2} className="text-center summary-val">{displayTotalHours > 0 ? displayTotalHours : ''}</td>
                   <td rowSpan={2} className="text-center summary-val" style={{ fontSize: '9px', lineHeight: '1.2' }}>
-                    {totalOT > 0 && <div>OT={totalOT}</div>}
+                    {finalOt > 0 && <div>OT={finalOt}</div>}
                     {totalRLV > 0 && <div>RLV={totalRLV}</div>}
                     {totalADM > 0 && <div>ADM={totalADM}</div>}
                   </td>

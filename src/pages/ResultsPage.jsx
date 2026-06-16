@@ -384,13 +384,15 @@ export default function ResultsPage() {
                   {activeShifts.map(st => (
                     <th key={st.code} style={{ textAlign: 'center' }}>
                       <ShiftBadge code={st.code} />
+                      <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginTop: '2px', fontWeight: 'normal' }}>
+                        {st.hours > 0 ? `${st.hours} ชม.` : ''}
+                      </div>
                     </th>
                   ))}
                   <th style={{ borderLeft: '1px solid var(--border-color)', textAlign: 'center' }}>รวมเวรทำงาน (วัน)</th>
                   <th style={{ textAlign: 'center' }}>เป้าหมาย (ชม.)</th>
-                  <th style={{ textAlign: 'center' }}>ชม. ปกติ</th>
+                  <th style={{ textAlign: 'center' }}>ชั่วโมงทำจริงรวม (ชม.)</th>
                   <th style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>ชม. OT</th>
-                  <th style={{ textAlign: 'center' }}>รวมทั้งหมด (ชม.)</th>
                 </tr>
               </thead>
               <tbody>
@@ -416,14 +418,11 @@ export default function ResultsPage() {
                     <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--color-text-muted)' }}>
                       {row.targetHrs > 0 ? row.targetHrs : '-'}
                     </td>
-                    <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--color-primary-dark)' }}>
-                      {row.totalHours - row.totalOTHours}
+                    <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--color-primary-dark)', background: 'rgba(59,130,246,0.05)' }}>
+                      {row.totalHours}
                     </td>
                     <td style={{ textAlign: 'center', fontWeight: 700, color: row.totalOTHours > 0 ? 'var(--color-danger)' : 'var(--color-text-muted)' }}>
                       {row.totalOTHours > 0 ? `+${row.totalOTHours}` : '0'}
-                    </td>
-                    <td style={{ textAlign: 'center', fontWeight: 700, background: 'rgba(59,130,246,0.05)' }}>
-                      {row.totalHours}
                     </td>
                   </tr>
                 ))}
