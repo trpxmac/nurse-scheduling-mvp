@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { CalendarDays, Save, CheckCircle, Info, X } from 'lucide-react';
+import { CalendarDays, Save, CheckCircle, Info, X, ExternalLink } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import {
   loadStaffList, loadShiftTypes, loadLeaveSchedules, saveLeaveSchedules,
   getDaysInMonth, getMonthName, getDayOfWeek, isWeekend,
@@ -149,11 +150,17 @@ export default function LeaveSchedulePage() {
       }}>
         <Info size={18} style={{ color: 'var(--color-primary)', marginTop: 2, flexShrink: 0 }} />
         <div style={{ fontSize: '0.85rem', lineHeight: 1.6 }}>
-          <strong>วิธีใช้:</strong> คลิกที่ช่องวันที่ของพนักงานเพื่อเลือกประเภทลา (AL, SL, TRN, ลาคลอด ฯลฯ)
-          คลิกอีกครั้งเพื่อเปลี่ยน หรือเลือก "ล้าง" เพื่อยกเลิก — กด <strong>บันทึก</strong> ก่อน Generate ตารางเวร
+          <strong>วิธีใช้:</strong> คลิกที่ช่องวันที่ของพนักงานเพื่อเลือกประเภทลา คลิกอีกครั้งเพื่อเปลี่ยน หรือเลือก "ล้าง" เพื่อยกเลิก — กด <strong>บันทึก</strong> ก่อน Generate ตารางเวร
           {totalLeaveDays > 0 && <span style={{ marginLeft: 8, color: 'var(--color-accent)', fontWeight: 700 }}>
             ✅ {totalLeaveDays} วันที่กำหนดไว้แล้ว
           </span>}
+          <span style={{ display: 'block', marginTop: 4 }}>
+            💡 ต้องการเพิ่มประเภทลาใหม่ (เช่น ลาคลอด)? ไปที่
+            <Link to="/shift-types" style={{ color: 'var(--color-primary)', fontWeight: 600, marginLeft: 4 }}>
+              ประเภทเวร <ExternalLink size={12} style={{ verticalAlign: 'middle' }} />
+            </Link>
+            {' '}แล้วกด "+ เพิ่มประเภท" ตั้ง Category เป็น <strong>LEAVE</strong> หรือ <strong>OTHER</strong>
+          </span>
         </div>
       </div>
 
@@ -254,12 +261,15 @@ export default function LeaveSchedulePage() {
                         const color = getShiftColor(shiftCode);
                         const shiftObj = leaveShifts.find(s => s.code === shiftCode);
                         const label = shiftObj ? shiftObj.name.split(' (')[0] : shiftCode;
+                        // ⚠️ Capture d and span NOW before d changes (fixes JS closure-in-loop bug)
+                        const startDay = d;
+                        const spanLen = span;
                         cells.push(
                           <td
-                            key={d}
-                            colSpan={span}
-                            onClick={(e) => handleCellClick(e, staff.id, d)}
-                            title={`${staff.firstName} — ${label} วันที่ ${d}${span > 1 ? `–${d + span - 1}` : ''}`}
+                            key={startDay}
+                            colSpan={spanLen}
+                            onClick={(e) => handleCellClick(e, staff.id, startDay)}
+                            title={`${staff.firstName} — ${label} วันที่ ${startDay}${spanLen > 1 ? `–${startDay + spanLen - 1}` : ''}`}
                             style={{
                               padding: '3px 0',
                               cursor: 'pointer',
@@ -268,41 +278,37 @@ export default function LeaveSchedulePage() {
                           >
                             <div style={{
                               background: color,
-                              borderRadius: span === 1 ? 4 : 4,
                               margin: '0 1px',
                               height: 26,
                               display: 'flex',
                               alignItems: 'center',
-                              justifyContent: span > 2 ? 'center' : 'center',
+                              justifyContent: 'center',
                               gap: 4,
-                              fontSize: span === 1 ? '0.62rem' : '0.72rem',
+                              fontSize: spanLen === 1 ? '0.62rem' : '0.72rem',
                               fontWeight: 700,
                               color: '#333',
                               whiteSpace: 'nowrap',
                               overflow: 'hidden',
-                              // Left and right rounded tips to look like a paper bar
                               borderTopLeftRadius: 6,
                               borderBottomLeftRadius: 6,
                               borderTopRightRadius: 6,
                               borderBottomRightRadius: 6,
-                              boxShadow: span > 1 ? `0 1px 4px ${color}88` : undefined,
+                              boxShadow: spanLen > 1 ? `0 1px 4px ${color}88` : undefined,
                               position: 'relative',
                             }}>
-                              {/* Left marker line */}
-                              {span > 1 && (
+                              {spanLen > 1 && (
                                 <span style={{
                                   position: 'absolute', left: 4, top: '50%', transform: 'translateY(-50%)',
                                   fontSize: '0.55rem', fontWeight: 900, color: '#33333399',
                                 }}>|</span>
                               )}
                               <span>{shiftCode}</span>
-                              {span > 2 && (
+                              {spanLen > 2 && (
                                 <span style={{ fontSize: '0.6rem', fontWeight: 400, opacity: 0.8 }}>
                                   {label}
                                 </span>
                               )}
-                              {/* Right marker line */}
-                              {span > 1 && (
+                              {spanLen > 1 && (
                                 <span style={{
                                   position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)',
                                   fontSize: '0.55rem', fontWeight: 900, color: '#33333399',
@@ -313,23 +319,24 @@ export default function LeaveSchedulePage() {
                         );
                         d += span;
                       } else {
-                        // Empty cell
+                        // ⚠️ Capture d NOW before d++ (fixes JS closure-in-loop bug)
+                        const emptyDay = d;
                         cells.push(
                           <td
-                            key={d}
-                            onClick={(e) => handleCellClick(e, staff.id, d)}
-                            title={`คลิกเพื่อกำหนดลา วันที่ ${d}`}
+                            key={emptyDay}
+                            onClick={(e) => handleCellClick(e, staff.id, emptyDay)}
+                            title={`คลิกเพื่อกำหนดลา วันที่ ${emptyDay}`}
                             style={{
                               padding: '2px 1px',
                               textAlign: 'center',
                               borderBottom: '1px solid var(--border-color-light)',
-                              background: isWeekend(viewMonth, d) ? 'rgba(245,158,11,0.04)' : undefined,
+                              background: isWeekend(viewMonth, emptyDay) ? 'rgba(245,158,11,0.04)' : undefined,
                               cursor: 'pointer',
                               minWidth: 32,
                               transition: 'background 0.1s',
                             }}
                             onMouseEnter={e => e.currentTarget.style.background = 'rgba(59,130,246,0.12)'}
-                            onMouseLeave={e => e.currentTarget.style.background = isWeekend(viewMonth, d) ? 'rgba(245,158,11,0.04)' : ''}
+                            onMouseLeave={e => e.currentTarget.style.background = isWeekend(viewMonth, emptyDay) ? 'rgba(245,158,11,0.04)' : ''}
                           >
                             <div style={{ minWidth: 28, height: 26, margin: '0 auto' }} />
                           </td>
