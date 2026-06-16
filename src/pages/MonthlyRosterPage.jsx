@@ -5,7 +5,7 @@ import {
   loadConfig, loadShiftTypes, loadStaffList,
   loadMonthlyRoster, saveMonthlyRoster,
   getDaysInMonth, getDayOfWeek, isWeekend, getMonthName,
-  loadActiveMonth, saveActiveMonth
+  loadActiveMonth, saveActiveMonth, loadMonthlySettings
 } from '../utils/storage';
 import MonthSelector from '../components/MonthSelector';
 import CustomDialog from '../components/CustomDialog';
@@ -22,6 +22,7 @@ export default function MonthlyRosterPage() {
   const [roster, setRoster] = useState({});
   const [saved, setSaved] = useState(false);
   const [viewMonth, setViewMonthState] = useState(loadActiveMonth());
+  const [monthlySettings, setMonthlySettings] = useState({});
   const [dialog, setDialog] = useState({ isOpen: false, type: 'CONFIRM', title: '', message: '', onConfirm: null, danger: false });
 
   const closeDialog = () => setDialog(prev => ({ ...prev, isOpen: false }));
@@ -39,12 +40,14 @@ export default function MonthlyRosterPage() {
     const month = loadActiveMonth();
     setViewMonth(month);
     setRoster(loadMonthlyRoster(month));
+    setMonthlySettings(loadMonthlySettings(month) || {});
   }, []);
 
   // Reload roster when viewMonth changes
   useEffect(() => {
     if (viewMonth) {
       setRoster(loadMonthlyRoster(viewMonth));
+      setMonthlySettings(loadMonthlySettings(viewMonth) || {});
       setSaved(false);
     }
   }, [viewMonth]);
@@ -232,13 +235,15 @@ export default function MonthlyRosterPage() {
               {activeStaff.map(staff => {
                 const staffRoster = roster[staff.id] || {};
                 let shiftHours = 0;
-                let otHours = 0;
+                let manualOt = 0;
                 for (const d of Object.keys(staffRoster)) {
                   const { shift, ot } = parseShift(staffRoster[d]);
                   shiftHours += getShiftHours(shift, shiftTypesMap);
-                  otHours += ot;
+                  manualOt += ot;
                 }
-                const totalHours = shiftHours + otHours;
+                const targetHrs = Number(monthlySettings.roster_hours) || 0;
+                const finalOt = targetHrs > 0 ? Math.max(0, (shiftHours + manualOt) - targetHrs) : manualOt;
+                const totalHours = shiftHours + manualOt;
                 const staffViolations = violations[staff.id] || new Set();
 
                 return (
@@ -275,11 +280,11 @@ export default function MonthlyRosterPage() {
                         })()}
                       </td>
                     ))}
-                    <td className="total-cell" style={{ borderLeft: '1px solid var(--border-color)', color: totalHours > config.max_weekly_hours * 5 ? 'var(--color-danger)' : 'var(--color-text-primary)' }}>
-                      {shiftHours}
+                    <td className="total-cell" style={{ fontWeight: 600, color: 'var(--color-primary-dark)', background: 'rgba(59,130,246,0.05)', borderLeft: '1px solid var(--border-color)' }}>
+                      {totalHours}
                     </td>
-                    <td className="total-cell" style={{ color: '#9ca3af' }}>
-                      {otHours}
+                    <td className="total-cell" style={{ fontWeight: 700, color: finalOt > 0 ? 'var(--color-danger)' : 'var(--color-text-muted)' }}>
+                      {finalOt > 0 ? `+${finalOt}` : '0'}
                     </td>
                   </tr>
                 );
