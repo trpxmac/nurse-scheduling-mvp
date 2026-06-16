@@ -131,15 +131,21 @@ export function generateAIRoster(staffList, shiftTypes, config, lockedSlots = {}
           }
           return (dayCoverage[a.code] || 0) - (dayCoverage[b.code] || 0);
         });
-        const chosen = availableShifts[0];
-
-        // Check constraints before assigning
-        const assignedStaffThisShift = activeStaff.filter(s => dayAssignments[s.id] === chosen.code);
-        if (isAssignmentValid(roster, staff, day, chosen.code, shiftTypesMap, config, assignedStaffThisShift)) {
-          roster[staff.id][day] = chosen.code;
-          dayAssignments[staff.id] = chosen.code;
-          dayCoverage[chosen.code] = (dayCoverage[chosen.code] || 0) + 1;
-        } else {
+        
+        let assigned = false;
+        for (const chosen of availableShifts) {
+          // Check constraints before assigning
+          const assignedStaffThisShift = activeStaff.filter(s => dayAssignments[s.id] === chosen.code);
+          if (isAssignmentValid(roster, staff, day, chosen.code, shiftTypesMap, config, assignedStaffThisShift)) {
+            roster[staff.id][day] = chosen.code;
+            dayAssignments[staff.id] = chosen.code;
+            dayCoverage[chosen.code] = (dayCoverage[chosen.code] || 0) + 1;
+            assigned = true;
+            break;
+          }
+        }
+        
+        if (!assigned) {
           roster[staff.id][day] = '-';
         }
       } else {
