@@ -3,7 +3,7 @@
    Generates schedule based on Config constraints
    ============================================= */
 
-import { getShiftHours, detectQuickReturns, buildShiftTypesMap } from './scheduling';
+import { getShiftHours, detectQuickReturns, buildShiftTypesMap, calcWeeklyHours } from './scheduling';
 
 export function isSenior(staff) {
   const lvl = staff.level || staff.position;
@@ -244,6 +244,15 @@ function isAssignmentValid(roster, staff, day, shiftCode, shiftTypesMap, config,
   // Check daily hours limit
   const shiftHours = getShiftHours(shiftCode, shiftTypesMap);
   if (shiftHours > config.max_daily_hours) return false;
+
+  // Check weekly hours limit
+  if (config.max_weekly_hours) {
+    const testRoster = { ...staffRoster, [day]: shiftCode };
+    const weeks = calcWeeklyHours(testRoster, shiftTypesMap, config.month);
+    if (weeks.some(w => w.hours > config.max_weekly_hours)) {
+      return false;
+    }
+  }
 
   // Check RN1 supervision constraint
   if (staff.level === 'RN1') {
