@@ -155,9 +155,10 @@ function findBestStaff(pool, roster, shiftCode, day, shiftTypesMap, config, days
     const currentHours = calcCurrentHours(roster[staff.id], shiftTypesMap);
     let score = 1000 - currentHours;
 
-    // Penalize if the staff already has a lot of THIS specific shift to ensure equal distribution
+    // Penalize heavily if the staff already has this specific shift
+    // Penalty is 500 per shift so that shift type balancing is strictly prioritized over total hours (max 240 difference)
     const currentShiftCount = Object.values(roster[staff.id]).filter(v => v === shiftCode).length;
-    score -= (currentShiftCount * 50);
+    score -= (currentShiftCount * 500);
 
     // Rule: Prioritize seniors if the shift doesn't have one yet
     if (!hasSenior && isSenior(staff)) {
