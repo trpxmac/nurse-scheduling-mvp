@@ -56,54 +56,54 @@ export const DEFAULT_CONFIG = {
 
 export const DEFAULT_SHIFT_TYPES = [
   // ── DAY shifts (count toward Day Coverage)
-  { id: 'M',   code: 'M',   name: 'เช้า (Morning)',           start: '07:00', end: '15:00', hours: 8,  category: 'DAY',   active: true,  hex: '#90EE90' },
-  { id: 'E',   code: 'E',   name: 'บ่าย (Evening)',           start: '15:00', end: '23:00', hours: 8,  category: 'DAY',   active: true,  hex: '#87CEEB' },
-  { id: 'D',   code: 'D',   name: 'กลางวัน 12 ชม. (Day 12hr)', start: '07:00', end: '19:00', hours: 12, category: 'DAY',   active: true,  hex: '#98FB98' },
+  { id: 'M', code: 'M', name: 'เช้า (Morning)', start: '07:00', end: '15:00', hours: 8, category: 'DAY', active: true, hex: '#90EE90' },
+  { id: 'E', code: 'E', name: 'บ่าย (Evening)', start: '15:00', end: '23:00', hours: 8, category: 'DAY', active: true, hex: '#87CEEB' },
+  { id: 'D', code: 'D', name: 'กลางวัน 12 ชม. (Day 12hr)', start: '07:00', end: '19:00', hours: 12, category: 'DAY', active: true, hex: '#98FB98' },
 
   // ── NIGHT shifts (count toward Night Coverage)
-  { id: 'N8',  code: 'N8',  name: 'ดึก 8 ชม. (Night 8hr)',    start: '23:00', end: '07:00', hours: 8,  category: 'NIGHT', active: true,  hex: '#DDA0DD' },
-  { id: 'N12', code: 'N12', name: 'กลางคืน 12 ชม. (Night 12hr)', start: '19:00', end: '07:00', hours: 12, category: 'NIGHT', active: true,  hex: '#E6E6FA' },
+  { id: 'N8', code: 'N8', name: 'ดึก 8 ชม. (Night 8hr)', start: '23:00', end: '07:00', hours: 8, category: 'NIGHT', active: true, hex: '#DDA0DD' },
+  { id: 'N12', code: 'N12', name: 'กลางคืน 12 ชม. (Night 12hr)', start: '19:00', end: '07:00', hours: 12, category: 'NIGHT', active: true, hex: '#E6E6FA' },
 
   // ── OFF (no hours counted)
-  { id: '-', code: '-', name: 'วันหยุด/พัก (Rest)',         start: '',      end: '',      hours: 0,  category: 'OFF',   active: true,  hex: '#F5F5F5' },
+  { id: '-', code: '-', name: 'พัก (Rest)', start: '', end: '', hours: 0, category: 'OFF', active: true, hex: '#F5F5F5' },
 
   // ── HOLIDAY
-  { id: 'H', code: 'H', name: 'วันหยุดนักขัตฤกษ์ (Holiday)', start: '',      end: '',      hours: 8,  category: 'OFF', active: true,  hex: '#DDA0DD' },
+  { id: 'H', code: 'H', name: 'วันหยุด (Holiday)', start: '', end: '', hours: 8, category: 'LEAVE', active: true, hex: '#DDA0DD' },
 
   // ── LEAVE (no work hours, leave tracking)
-  { id: 'AL',  code: 'AL',  name: 'ลาพักร้อน (Annual Leave)', start: '',      end: '',      hours: 0,  category: 'LEAVE', active: true,  hex: '#FFD700' },
-  { id: 'SL',  code: 'SL',  name: 'ลาป่วย (Sick Leave)',      start: '',      end: '',      hours: 0,  category: 'LEAVE', active: true,  hex: '#FFA07A' },
+  { id: 'AL', code: 'AL', name: 'ลาพักร้อน (Annual Leave)', start: '', end: '', hours: 0, category: 'LEAVE', active: true, hex: '#FFD700' },
+  { id: 'SL', code: 'SL', name: 'ลาป่วย (Sick Leave)', start: '', end: '', hours: 0, category: 'LEAVE', active: true, hex: '#FFA07A' },
 
   // ── OTHER
-  { id: 'TRN', code: 'TRN', name: 'อบรม (Training)',          start: '',      end: '',      hours: 0,  category: 'OTHER', active: true,  hex: '#ADD8E6' },
-  { id: 'MTG', code: 'MTG', name: 'ประชุม (Meeting)',          start: '',      end: '',      hours: 0,  category: 'OTHER', active: false, hex: '#D3D3D3' },
+  { id: 'TRN', code: 'TRN', name: 'อบรม (Training)', start: '', end: '', hours: 0, category: 'OTHER', active: true, hex: '#ADD8E6' },
+  { id: 'MTG', code: 'MTG', name: 'ประชุม (Meeting)', start: '', end: '', hours: 0, category: 'OTHER', active: false, hex: '#D3D3D3' },
 ];
 
 export const MOCK_STAFF = [
   // ── Senior RN (RN4, RN3, RN2) (9 คน) ──
-  { id: 'S01', employeeId: '1586347', firstName: 'ปนัดดา',   lastName: 'จิตต์เจริญ',     nickname: 'ดา',   position: 'RN', level: 'RN4', active: true },
-  { id: 'S02', employeeId: '622063',  firstName: 'เขมจิรา',   lastName: 'ศิริสุวรรณ',     nickname: 'จิรา', position: 'RN', level: 'RN4', active: true },
-  { id: 'S03', employeeId: '596823',  firstName: 'สุภาวดี',   lastName: 'ธนะพัฒน์',       nickname: 'ดี',   position: 'RN', level: 'RN3', active: true },
-  { id: 'S04', employeeId: '553005',  firstName: 'ศศิธร',     lastName: 'วงศ์สวัสดิ์',     nickname: 'ธร',   position: 'RN', level: 'RN3', active: true },
-  { id: 'S05', employeeId: '611077',  firstName: 'พิมพ์ผกา',  lastName: 'แก้วมณี',        nickname: 'กา',   position: 'RN', level: 'RN3', active: true },
-  { id: 'S06', employeeId: '630177',  firstName: 'จิราภรณ์',  lastName: 'สาระคุณ',        nickname: 'ภรณ์', position: 'RN', level: 'RN2', active: true },
-  { id: 'S07', employeeId: '635143',  firstName: 'อาทิตยา',   lastName: 'ชนะกุล',         nickname: 'ยา',   position: 'RN', level: 'RN2', active: true },
-  { id: 'S08', employeeId: '501694',  firstName: 'กฤษฎิ์ภูมิ', lastName: 'วรรณดี',         nickname: 'ภูมิ', position: 'RN', level: 'RN2', active: true },
-  { id: 'S09', employeeId: '628475',  firstName: 'วรัญญา',    lastName: 'รุ่งเรือง',       nickname: 'รัญ',  position: 'RN', level: 'RN2', active: true },
+  { id: 'S01', employeeId: '1586347', firstName: 'ปนัดดา', lastName: 'จิตต์เจริญ', nickname: 'ดา', position: 'RN', level: 'RN4', active: true },
+  { id: 'S02', employeeId: '622063', firstName: 'เขมจิรา', lastName: 'ศิริสุวรรณ', nickname: 'จิรา', position: 'RN', level: 'RN4', active: true },
+  { id: 'S03', employeeId: '596823', firstName: 'สุภาวดี', lastName: 'ธนะพัฒน์', nickname: 'ดี', position: 'RN', level: 'RN3', active: true },
+  { id: 'S04', employeeId: '553005', firstName: 'ศศิธร', lastName: 'วงศ์สวัสดิ์', nickname: 'ธร', position: 'RN', level: 'RN3', active: true },
+  { id: 'S05', employeeId: '611077', firstName: 'พิมพ์ผกา', lastName: 'แก้วมณี', nickname: 'กา', position: 'RN', level: 'RN3', active: true },
+  { id: 'S06', employeeId: '630177', firstName: 'จิราภรณ์', lastName: 'สาระคุณ', nickname: 'ภรณ์', position: 'RN', level: 'RN2', active: true },
+  { id: 'S07', employeeId: '635143', firstName: 'อาทิตยา', lastName: 'ชนะกุล', nickname: 'ยา', position: 'RN', level: 'RN2', active: true },
+  { id: 'S08', employeeId: '501694', firstName: 'กฤษฎิ์ภูมิ', lastName: 'วรรณดี', nickname: 'ภูมิ', position: 'RN', level: 'RN2', active: true },
+  { id: 'S09', employeeId: '628475', firstName: 'วรัญญา', lastName: 'รุ่งเรือง', nickname: 'รัญ', position: 'RN', level: 'RN2', active: true },
 
   // ── Junior RN (RN1) (3 คน) ──
-  { id: 'S10', employeeId: '741258',  firstName: 'ณิชาภัทร',  lastName: 'ตั้งเจริญ',      nickname: 'ณิชา', position: 'RN', level: 'RN1', active: true },
-  { id: 'S11', employeeId: '752369',  firstName: 'พรนภา',    lastName: 'สุขสันต์',       nickname: 'พร',   position: 'RN', level: 'RN1', active: true },
-  { id: 'S12', employeeId: '763480',  firstName: 'กิตติศักดิ์', lastName: 'ใจตรง',         nickname: 'กิต',  position: 'RN', level: 'RN1', active: true },
+  { id: 'S10', employeeId: '741258', firstName: 'ณิชาภัทร', lastName: 'ตั้งเจริญ', nickname: 'ณิชา', position: 'RN', level: 'RN1', active: true },
+  { id: 'S11', employeeId: '752369', firstName: 'พรนภา', lastName: 'สุขสันต์', nickname: 'พร', position: 'RN', level: 'RN1', active: true },
+  { id: 'S12', employeeId: '763480', firstName: 'กิตติศักดิ์', lastName: 'ใจตรง', nickname: 'กิต', position: 'RN', level: 'RN1', active: true },
 
   // ── PN — Practical Nurses (3 คน) ──
-  { id: 'S13', employeeId: '710634',  firstName: 'กันยิกา',   lastName: 'เรืองขจร',       nickname: 'กัน',  position: 'PN', level: '-', active: true },
-  { id: 'S14', employeeId: '603484',  firstName: 'จุฑามาศ',   lastName: 'ทองใบ',          nickname: 'มาศ',  position: 'PN', level: '-', active: true },
-  { id: 'S15', employeeId: '600133',  firstName: 'วรรณภา',    lastName: 'สุขสมบูรณ์',     nickname: 'แอน',  position: 'PN', level: '-', active: true },
+  { id: 'S13', employeeId: '710634', firstName: 'กันยิกา', lastName: 'เรืองขจร', nickname: 'กัน', position: 'PN', level: '-', active: true },
+  { id: 'S14', employeeId: '603484', firstName: 'จุฑามาศ', lastName: 'ทองใบ', nickname: 'มาศ', position: 'PN', level: '-', active: true },
+  { id: 'S15', employeeId: '600133', firstName: 'วรรณภา', lastName: 'สุขสมบูรณ์', nickname: 'แอน', position: 'PN', level: '-', active: true },
 
   // ── PA — Patient Assistants (2 คน) ──
-  { id: 'S16', employeeId: '548201',  firstName: 'นภาพร',     lastName: 'พงษ์ประเสริฐ',   nickname: 'นภา',  position: 'PA', level: '-', active: true },
-  { id: 'S17', employeeId: '615892',  firstName: 'คำศรี',     lastName: 'บุญมาก',         nickname: 'ศรี',  position: 'PA', level: '-', active: true },
+  { id: 'S16', employeeId: '548201', firstName: 'นภาพร', lastName: 'พงษ์ประเสริฐ', nickname: 'นภา', position: 'PA', level: '-', active: true },
+  { id: 'S17', employeeId: '615892', firstName: 'คำศรี', lastName: 'บุญมาก', nickname: 'ศรี', position: 'PA', level: '-', active: true },
 ];
 
 export const MOCK_ROSTER = {};
@@ -226,11 +226,11 @@ export function saveStaffList(staffList) {
 export function loadMonthlyRoster(yearMonth) {
   const scopedKey = getScopedKey(SCOPED_KEYS.MONTHLY_ROSTER);
   const monthKey = yearMonth ? `${scopedKey}_${yearMonth}` : scopedKey;
-  
+
   // Try loading month-scoped data
   const data = loadData(monthKey, null);
   if (data !== null) return data;
-  
+
   // Migration: If no month-scoped data exists, load old unscoped data as a fallback
   return loadData(scopedKey, MOCK_ROSTER);
 }
