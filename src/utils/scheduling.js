@@ -172,12 +172,12 @@ export function checkCoverageRequirements(coverage, config) {
   const mode = config.shift_mode || '8HR';
   const requirements = {};
   if (mode === '8HR' || mode === 'MIXED') {
-    requirements.M  = config.required_M_coverage  || 0;
-    requirements.E  = config.required_E_coverage  || 0;
+    requirements.M = config.required_M_coverage || 0;
+    requirements.E = config.required_E_coverage || 0;
     requirements.N8 = config.required_N8_coverage || 0;
   }
   if (mode === '12HR' || mode === 'MIXED') {
-    requirements.D   = config.required_D_coverage   || 0;
+    requirements.D = config.required_D_coverage || 0;
     requirements.N12 = config.required_N12_coverage || 0;
   }
 
