@@ -185,7 +185,7 @@ export default function ConfigPage() {
               onChange={(e) => handleMonthlyChange('holiday_hours', e.target.value)}
               placeholder="เว้นว่างเพื่อแสดงเป็นเส้นประ"
             />
-            <span className="form-hint">จำนวนชั่วโมงหยุดนักขัตฤกษ์ของเดือน <strong>{config.month && getMonthName(config.month)}</strong> — นำไปลบออกจาก Roster Hours ตอนคิด OT</span>
+            <span className="form-hint">จำนวนชั่วโมงหยุดนักขัตฤกษ์ของเดือน <strong>{config.month && getMonthName(config.month)}</strong></span>
           </div>
         </div>
       </div>

@@ -258,38 +258,18 @@ export default function MonthlyRosterPage() {
                         {(() => {
                           const { shift, ot, otType } = parseShift(staffRoster[d]);
                           return (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', height: '100%', justifyContent: 'center' }}>
                               <select
                                 className={`roster-cell-select ${getShiftClass(shift)}`}
                                 value={shift}
-                                onChange={(e) => handleShiftChange(staff.id, d, { shift: e.target.value, ot, otType })}
+                                onChange={(e) => handleShiftChange(staff.id, d, { shift: e.target.value, ot: 0, otType: '' })}
+                                style={{ width: '100%', height: '100%', border: 'none', background: 'transparent' }}
                               >
                                 <option value="">-</option>
                                 {activeShifts.map(st => (
                                   <option key={st.code} value={st.code}>{st.code}</option>
                                 ))}
                               </select>
-                              <input 
-                                type="text" 
-                                className="ot-input"
-                                value={ot > 0 ? `${ot}${otType || ''}` : ''}
-                                placeholder="ชม."
-                                onChange={(e) => {
-                                  const val = e.target.value.toUpperCase();
-                                  const match = val.match(/^(\d*)([A-Z]*)$/);
-                                  let newOt = 0;
-                                  let newOtType = '';
-                                  if (match) {
-                                    newOt = Number(match[1]) || 0;
-                                    newOtType = match[2];
-                                  } else {
-                                    newOt = parseInt(val, 10) || 0;
-                                    newOtType = val.replace(/[0-9]/g, '');
-                                  }
-                                  handleShiftChange(staff.id, d, { shift, ot: newOt, otType: newOtType });
-                                }}
-                                title="จำนวน ชม. OT/RLV/ADM (เช่น 8, 8R, 8A)"
-                              />
                             </div>
                           );
                         })()}
