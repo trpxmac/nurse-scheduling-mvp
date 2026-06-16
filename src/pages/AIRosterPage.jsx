@@ -148,7 +148,13 @@ export default function AIRosterPage() {
         <div className="flex gap-lg items-center" style={{ flexWrap: 'wrap', fontSize: '0.82rem' }}>
           <span><strong>Mode:</strong> {config.shift_mode}</span>
           <span><strong>บุคลากร:</strong> {activeStaff.length} คน</span>
-          <span><strong>Coverage ขั้นต่ำ:</strong> M={config.required_M_coverage}, E={config.required_E_coverage}, N8={config.required_N8_coverage}</span>
+          <span>
+            <strong>Coverage ขั้นต่ำ:</strong>{' '}
+            {config.shift_mode === '12HR' 
+              ? `D=${config.required_D_coverage || 0}, N12=${config.required_N12_coverage || 0}`
+              : `M=${config.required_M_coverage || 0}, E=${config.required_E_coverage || 0}, N8=${config.required_N8_coverage || 0}`
+            }
+          </span>
           <span><strong>พักขั้นต่ำ:</strong> {config.min_rest_hours} ชม.</span>
           <span><strong>ทำงานสูงสุด/วัน:</strong> {config.max_daily_hours} ชม.</span>
         </div>

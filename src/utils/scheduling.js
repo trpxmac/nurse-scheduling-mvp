@@ -23,7 +23,7 @@ export function parseShift(cell) {
  * Get shift hours from shift code using shift types map
  */
 export function getShiftHours(shiftCode, shiftTypesMap) {
-  if (!shiftCode || shiftCode === 'OFF' || shiftCode === '') return 0;
+  if (!shiftCode || shiftCode === '-' || shiftCode === '') return 0;
   const st = shiftTypesMap[shiftCode];
   return st ? st.hours : 0;
 }
@@ -88,8 +88,8 @@ export function detectQuickReturns(staffRoster, shiftTypesMap, minRestHours, yea
   for (let d = 2; d <= daysInMonth; d++) {
     const { shift: prevShiftCode } = parseShift(staffRoster[d - 1]);
     const { shift: currShiftCode } = parseShift(staffRoster[d]);
-    if (!prevShiftCode || prevShiftCode === 'OFF' || prevShiftCode === '') continue;
-    if (!currShiftCode || currShiftCode === 'OFF' || currShiftCode === '') continue;
+    if (!prevShiftCode || prevShiftCode === '-' || prevShiftCode === '') continue;
+    if (!currShiftCode || currShiftCode === '-' || currShiftCode === '') continue;
 
     const prevShift = shiftTypesMap[prevShiftCode];
     const currShift = shiftTypesMap[currShiftCode];
@@ -148,12 +148,12 @@ export function calcDailyCoverage(roster, activeStaffIds, shiftTypesMap) {
     coverage[day] = {};
     // Initialize all shift codes to 0
     for (const code of Object.keys(shiftTypesMap)) {
-      if (code !== 'OFF') coverage[day][code] = 0;
+      if (code !== '-') coverage[day][code] = 0;
     }
 
     for (const staffId of activeStaffIds) {
       const { shift } = parseShift(roster[staffId]?.[day]);
-      if (shift && shift !== 'OFF' && shift !== '') {
+      if (shift && shift !== '-' && shift !== '') {
         if (coverage[day][shift] !== undefined) {
           coverage[day][shift]++;
         }
