@@ -130,8 +130,8 @@ export function generateAIRoster(staffList, shiftTypes, config) {
   }
 
   // Calculate score
-  const score = calculateAIScore(roster, activeStaff, shiftTypesMap, config, daysInMonth);
-  const summary = generateSummary(roster, activeStaff, shiftTypesMap, config, daysInMonth);
+  const score = calculateAIScore(roster, activeStaff, shiftTypesMap, config, daysInMonth, workShifts);
+  const summary = generateSummary(roster, activeStaff, shiftTypesMap, config, daysInMonth, workShifts);
 
   return { roster, score, summary };
 }
@@ -310,7 +310,7 @@ function ensureRestDays(staffRoster, daysInMonth) {
 /**
  * Calculate AI Quality Score (0-100)
  */
-function calculateAIScore(roster, staff, shiftTypesMap, config, daysInMonth) {
+function calculateAIScore(roster, staff, shiftTypesMap, config, daysInMonth, workShifts) {
   let score = 100;
   const yearMonth = config.month;
 
@@ -338,15 +338,16 @@ function calculateAIScore(roster, staff, shiftTypesMap, config, daysInMonth) {
         dayCoverage[shift] = (dayCoverage[shift] || 0) + 1;
       }
     }
-    if ((dayCoverage['M'] || 0) < config.required_M_coverage) score -= 1;
-    if ((dayCoverage['E'] || 0) < config.required_E_coverage) score -= 1;
-    if ((dayCoverage['N8'] || 0) < config.required_N8_coverage) score -= 1;
+    for (const shift of workShifts) {
+      const required = config[`required_${shift.code}_coverage`] || 0;
+      if ((dayCoverage[shift.code] || 0) < required) score -= 1;
+    }
   }
 
   return Math.max(0, Math.min(100, Math.round(score)));
 }
 
-function generateSummary(roster, staff, shiftTypesMap, config, daysInMonth) {
+function generateSummary(roster, staff, shiftTypesMap, config, daysInMonth, workShifts) {
   const yearMonth = config.month;
   let totalQuickReturns = 0;
   let coverageShortages = 0;
@@ -366,9 +367,10 @@ function generateSummary(roster, staff, shiftTypesMap, config, daysInMonth) {
         dayCoverage[shift] = (dayCoverage[shift] || 0) + 1;
       }
     }
-    if ((dayCoverage['M'] || 0) < config.required_M_coverage) coverageShortages++;
-    if ((dayCoverage['E'] || 0) < config.required_E_coverage) coverageShortages++;
-    if ((dayCoverage['N8'] || 0) < config.required_N8_coverage) coverageShortages++;
+    for (const shift of workShifts) {
+      const required = config[`required_${shift.code}_coverage`] || 0;
+      if ((dayCoverage[shift.code] || 0) < required) coverageShortages++;
+    }
   }
 
   const avgHours = hoursList.length > 0 ? Math.round(hoursList.reduce((a, b) => a + b, 0) / hoursList.length) : 0;
