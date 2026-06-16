@@ -236,6 +236,10 @@ export default function ResultsPage() {
         <div className="page-header-left">
           <h1>📊 ตรวจสอบผลลัพธ์</h1>
           <p>{getMonthName(viewMonth)} — {config.unit_name || config.hospital_name}</p>
+          <div style={{ marginTop: '8px', display: 'flex', gap: '16px', fontSize: '0.9rem', color: 'var(--color-text-muted)' }}>
+            <span><strong>เป้าหมาย (Roster Hours):</strong> {monthlySettings.roster_hours || '-'} ชม.</span>
+            <span><strong>วันหยุดนักขัตฤกษ์ (Holiday Hours):</strong> {monthlySettings.holiday_hours || '-'} ชม.</span>
+          </div>
         </div>
         <div className="page-header-actions">
           <MonthSelector value={viewMonth} onChange={setViewMonth} />
@@ -385,7 +389,7 @@ export default function ResultsPage() {
                     <th key={st.code} style={{ textAlign: 'center' }}>
                       <ShiftBadge code={st.code} />
                       <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginTop: '2px', fontWeight: 'normal' }}>
-                        {st.hours > 0 ? `${st.hours} ชม.` : ''}
+                        {(st.start && st.end) ? `${st.start}-${st.end}` : ''}
                       </div>
                     </th>
                   ))}
