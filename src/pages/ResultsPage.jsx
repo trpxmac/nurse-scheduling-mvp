@@ -64,8 +64,7 @@ export default function ResultsPage() {
     let totalShiftHours = 0;
     let totalOTHours = 0;
     const reqHrs = Number(monthlySettings.roster_hours) || 0;
-    const holHrs = Number(monthlySettings.holiday_hours) || 0;
-    const targetHrs = Math.max(0, reqHrs - holHrs);
+    const targetHrs = reqHrs;
 
     const hours = activeStaff.map(s => {
       let sh = 0; let manualOt = 0;
@@ -96,8 +95,7 @@ export default function ResultsPage() {
   // Chart Data
   const hoursChartData = useMemo(() => {
     const reqHrs = Number(monthlySettings.roster_hours) || 0;
-    const holHrs = Number(monthlySettings.holiday_hours) || 0;
-    const targetHrs = Math.max(0, reqHrs - holHrs);
+    const targetHrs = reqHrs;
 
     return activeStaff.map(s => {
       let shiftHours = 0;
@@ -190,8 +188,7 @@ export default function ResultsPage() {
   // Staff Shift Summary Data
   const staffShiftSummary = useMemo(() => {
     const reqHrs = Number(monthlySettings.roster_hours) || 0;
-    const holHrs = Number(monthlySettings.holiday_hours) || 0;
-    const targetHrs = Math.max(0, reqHrs - holHrs);
+    const targetHrs = reqHrs;
 
     return activeStaff.map(s => {
       const counts = {};
