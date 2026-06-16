@@ -122,14 +122,19 @@ export function generateAIRoster(staffList, shiftTypes, config, lockedSlots = {}
       // Find a suitable shift
       const availableShifts = workShifts.filter(s => s.code !== '-');
       if (availableShifts.length > 0) {
-        // Pick the shift this staff has done the least, then by least coverage
+        // Pick the shift that needs extra staff the most (lowest ratio of assigned / required)
         availableShifts.sort((a, b) => {
+          const reqA = config[`required_${a.code}_coverage`] || 1; // avoid div by 0
+          const reqB = config[`required_${b.code}_coverage`] || 1;
+          const ratioA = (dayCoverage[a.code] || 0) / reqA;
+          const ratioB = (dayCoverage[b.code] || 0) / reqB;
+          if (ratioA !== ratioB) {
+            return ratioA - ratioB;
+          }
+          // Tie-breaker: staff's own shift count
           const aStaffCount = Object.values(roster[staff.id]).filter(v => v === a.code).length;
           const bStaffCount = Object.values(roster[staff.id]).filter(v => v === b.code).length;
-          if (aStaffCount !== bStaffCount) {
-             return aStaffCount - bStaffCount; 
-          }
-          return (dayCoverage[a.code] || 0) - (dayCoverage[b.code] || 0);
+          return aStaffCount - bStaffCount;
         });
         
         let assigned = false;
@@ -154,10 +159,7 @@ export function generateAIRoster(staffList, shiftTypes, config, lockedSlots = {}
     }
   }
 
-  // Phase 3: Ensure everyone has some rest — at least 1 OFF per 7 consecutive days
-  for (const staff of activeStaff) {
-    ensureRestDays(roster[staff.id], daysInMonth);
-  }
+
 
   // Calculate score
   const score = calculateAIScore(roster, activeStaff, shiftTypesMap, config, daysInMonth, workShifts);
@@ -371,21 +373,6 @@ function calcCurrentHours(staffRoster, shiftTypesMap) {
   return total;
 }
 
-function ensureRestDays(staffRoster, daysInMonth) {
-  for (let d = 1; d <= daysInMonth - 6; d++) {
-    let consecutive = 0;
-    for (let i = 0; i < 7; i++) {
-      if (staffRoster[d + i] && staffRoster[d + i] !== '-') {
-        consecutive++;
-      }
-    }
-    if (consecutive >= 7) {
-      // Force one day off in the middle
-      const midDay = d + 3;
-      staffRoster[midDay] = '-';
-    }
-  }
-}
 
 /**
  * Calculate AI Quality Score (0-100)
