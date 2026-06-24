@@ -124,7 +124,6 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden;
 }
 
 /* ---- Typography ---- */
@@ -758,22 +757,22 @@ a:hover {
 
 /* ---- Roster Grid ---- */
 .roster-grid {
-  overflow: auto;
-  max-height: calc(100vh - 220px);
+  width: 100%;
 }
 
 .roster-table {
   border-collapse: collapse;
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   min-width: 100%;
 }
 
 .roster-table th,
 .roster-table td {
-  padding: 6px 4px;
+  padding: 0px 0px;
   text-align: center;
   border: 1px solid var(--border-color-light);
   white-space: nowrap;
+  height: 22px;
 }
 
 .roster-table thead th {
@@ -793,34 +792,18 @@ a:hover {
   background: var(--color-bg-secondary);
   z-index: 5;
   text-align: left;
-  padding-left: 10px;
+  padding-left: 2px;
+  padding-right: 2px;
   font-weight: 600;
-  min-width: 140px;
+  min-width: 90px;
   border-right: 2px solid var(--border-color);
+  font-size: 0.7rem;
 }
 
 .roster-table thead .staff-name-cell {
   z-index: 15;
 }
 
-/* ---- Roster Cell Interactive Elements ---- */
-.roster-cell-select {
-  width: 100%;
-  border: none;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-align: center;
-  text-align-last: center;
-  cursor: pointer;
-  appearance: none;
-  outline: none;
-  padding: 2px 0;
-  height: 24px;
-}
-.roster-cell-select:focus {
-  box-shadow: 0 0 0 2px var(--color-primary-glow);
-}
 
 .shift-none { background: transparent; color: var(--color-text-primary); }
 .shift-M { background: var(--shift-M-bg); color: var(--shift-M-text); }
@@ -867,18 +850,21 @@ a:hover {
   background: var(--color-bg-tertiary);
   font-weight: 700;
   color: var(--color-text-primary);
-  min-width: 60px;
+  min-width: 40px;
 }
 
 .roster-cell-select {
-  width: 52px;
-  padding: 3px 2px;
-  font-size: 0.72rem;
+  width: 26px;
+  height: 20px;
+  padding: 0;
+  font-size: 0.75rem;
   font-weight: 700;
   border: 1px solid transparent;
   border-radius: 4px;
   cursor: pointer;
   text-align: center;
+  text-align-last: center;
+  appearance: none;
   outline: none;
   transition: all var(--transition-fast);
   font-family: var(--font-primary);
@@ -990,6 +976,94 @@ a:hover {
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--color-text-secondary);
+}
+
+/* ---- Score Tier Cards ---- */
+.score-tier-card {
+  flex: 1;
+  min-width: 260px;
+  max-width: 340px;
+  background: var(--color-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.score-tier-card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  transform: translateY(-1px);
+}
+
+.score-tier-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.score-tier-icon {
+  font-size: 1.2rem;
+}
+
+.score-tier-title {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--color-text);
+  flex: 1;
+}
+
+.score-tier-badge {
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.score-tier-bar-bg {
+  width: 100%;
+  height: 6px;
+  background: var(--color-bg-secondary);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.score-tier-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.6s ease;
+}
+
+.score-tier-weight {
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.score-tier-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: var(--space-xs);
+  padding-top: var(--space-xs);
+  border-top: 1px solid var(--border-color);
+}
+
+.score-tier-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+  gap: var(--space-sm);
+}
+
+.score-tier-count {
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--color-text-muted);
 }
 
 /* ---- Page Header ---- */

@@ -3,15 +3,26 @@ import { Users, Plus, Save, CheckCircle, Trash2, Search, UserPlus, X } from 'luc
 import { loadStaffList, saveStaffList, generateStaffId, loadShiftTypes } from '../utils/storage';
 import Modal from '../components/Modal';
 
-const POSITIONS = ['RN4', 'RN3', 'RN2', 'RN1', 'PN', 'PA', 'NA'];
-const LEVELS = ['RN4', 'RN3', 'RN2', 'RN1'];
+const POSITIONS = ['HOD', 'RN4', 'RN3', 'RN2', 'RN1', 'PN', 'PA', 'NA'];
+const LEVELS = ['HOD', 'RN4', 'RN3', 'RN2', 'RN1'];
 const EMPLOYMENT_TYPES = ['Full-time', 'Part-time'];
+
+const DAYS_OF_WEEK = [
+  { value: 0, label: 'อาทิตย์ (Sun)' },
+  { value: 1, label: 'จันทร์ (Mon)' },
+  { value: 2, label: 'อังคาร (Tue)' },
+  { value: 3, label: 'พุธ (Wed)' },
+  { value: 4, label: 'พฤหัสฯ (Thu)' },
+  { value: 5, label: 'ศุกร์ (Fri)' },
+  { value: 6, label: 'เสาร์ (Sat)' },
+];
 
 export default function StaffListPage() {
   const [staffList, setStaffList] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editIndex, setEditIndex] = useState(-1);
   const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterPos, setFilterPos] = useState('');
   const [shiftTypes, setShiftTypes] = useState([]);
@@ -20,13 +31,22 @@ export default function StaffListPage() {
   const [form, setForm] = useState({
     id: '', firstName: '', lastName: '', nickname: '',
     position: 'RN2', employmentType: 'Full-time',
-    avoid_staff: [], avoid_shifts: [], avoid_levels: [], active: true,
+    avoid_staff: [], avoid_shifts: [], avoid_levels: [], fixed_days_off: [], active: true,
+    shift_limits: {}
   });
 
   useEffect(() => {
-    setStaffList(loadStaffList());
-    setShiftTypes(loadShiftTypes().filter(s => s.active && s.code !== 'OFF' && s.category !== 'LEAVE' && s.category !== 'OTHER'));
+    async function init() {
+      const st = await loadStaffList();
+      const shifts = await loadShiftTypes();
+      setStaffList(st);
+      setShiftTypes(shifts.filter(s => s.active && s.category !== 'OFF' && s.category !== 'LEAVE' && s.category !== 'OTHER'));
+      setLoading(false);
+    }
+    init();
   }, []);
+
+  if (loading) return <div className="page-container"><div className="card" style={{padding:'40px',textAlign:'center'}}>กำลังโหลดข้อมูล...</div></div>;
 
   const handleSave = () => {
     saveStaffList(staffList);
@@ -38,7 +58,8 @@ export default function StaffListPage() {
     setForm({
       id: generateStaffId(), firstName: '', lastName: '', nickname: '',
       position: 'RN2', employmentType: 'Full-time',
-      avoid_staff: [], avoid_shifts: [], avoid_levels: [], active: true,
+      avoid_staff: [], avoid_shifts: [], avoid_levels: [], fixed_days_off: [], active: true,
+      shift_limits: {}
     });
     setAvoidStaffSearch('');
     setShowAvoidStaffDropdown(false);
@@ -53,7 +74,9 @@ export default function StaffListPage() {
       employmentType: s.employmentType || 'Full-time',
       avoid_staff: s.avoid_staff || [], 
       avoid_shifts: s.avoid_shifts || [],
-      avoid_levels: s.avoid_levels || [] 
+      avoid_levels: s.avoid_levels || [],
+      fixed_days_off: s.fixed_days_off || [],
+      shift_limits: s.shift_limits || {}
     });
     setAvoidStaffSearch('');
     setShowAvoidStaffDropdown(false);
@@ -76,26 +99,45 @@ export default function StaffListPage() {
     });
   };
 
+  const handleShiftLimitChange = (shiftCode, field, value) => {
+    setForm(prev => {
+      const currentLimits = prev.shift_limits || {};
+      const shiftLimit = currentLimits[shiftCode] || { min: '', max: '' };
+      return {
+        ...prev,
+        shift_limits: {
+          ...currentLimits,
+          [shiftCode]: { ...shiftLimit, [field]: value }
+        }
+      };
+    });
+  };
+
   const handleSubmitForm = () => {
     if (!form.firstName || !form.lastName) return;
+    let newList;
     if (editIndex >= 0) {
-      const updated = [...staffList];
-      updated[editIndex] = { ...form };
-      setStaffList(updated);
+      newList = [...staffList];
+      newList[editIndex] = { ...form };
     } else {
-      setStaffList(prev => [...prev, { ...form }]);
+      newList = [...staffList, { ...form }];
     }
+    setStaffList(newList);
+    saveStaffList(newList);
     setShowModal(false);
   };
 
   const handleDelete = (index) => {
-    setStaffList(prev => prev.filter((_, i) => i !== index));
+    const updated = staffList.filter((_, i) => i !== index);
+    setStaffList(updated);
+    saveStaffList(updated);
   };
 
   const handleToggleActive = (index) => {
     const updated = [...staffList];
     updated[index] = { ...updated[index], active: !updated[index].active };
     setStaffList(updated);
+    saveStaffList(updated);
   };
 
   // Filtered list
@@ -163,9 +205,9 @@ export default function StaffListPage() {
               <tr>
                 <th>ID</th>
                 <th>ชื่อ-นามสกุล</th>
-                <th>ชื่อเล่น</th>
                 <th>ระดับ/ตำแหน่ง</th>
                 <th>ประเภท</th>
+                <th>เงื่อนไข (HOD/จำกัดเวร)</th>
                 <th>ข้อจำกัด (Avoid)</th>
                 <th>สถานะ</th>
                 <th>จัดการ</th>
@@ -180,7 +222,6 @@ export default function StaffListPage() {
                     <td style={{ fontWeight: 600 }}>
                       {staff.firstName} {staff.lastName}
                     </td>
-                    <td>{staff.nickname || '-'}</td>
                     <td>
                       <span className="badge badge-info">{staff.level && staff.level !== '-' ? staff.level : staff.position}</span>
                     </td>
@@ -190,7 +231,26 @@ export default function StaffListPage() {
                       </span>
                     </td>
                     <td className="text-sm">
-                      {((staff.avoid_shifts || []).length > 0 || (staff.avoid_staff || []).length > 0) ? (
+                      <div className="flex flex-col gap-xs">
+                        {(staff.position === 'HOD' || staff.level === 'HOD') && (
+                          <span className="badge badge-info" style={{ fontSize: '0.75rem', alignSelf: 'flex-start' }}>
+                            👔 HOD (Office)
+                          </span>
+                        )}
+                        {staff.shift_limits && Object.keys(staff.shift_limits).map(code => {
+                          const limit = staff.shift_limits[code];
+                          if (!limit.min && !limit.max) return null;
+                          return (
+                            <span key={code} className="text-muted" style={{ fontSize: '0.75rem' }}>
+                              ⏱️ เวร {code}: {limit.min ? `≥${limit.min}` : ''} {limit.min && limit.max ? '|' : ''} {limit.max ? `≤${limit.max}` : ''}
+                            </span>
+                          );
+                        })}
+                        {(staff.position !== 'HOD' && staff.level !== 'HOD') && (!staff.shift_limits || Object.keys(staff.shift_limits).every(k => !staff.shift_limits[k].min && !staff.shift_limits[k].max)) && '-'}
+                      </div>
+                    </td>
+                    <td className="text-sm">
+                      {((staff.avoid_shifts || []).length > 0 || (staff.avoid_staff || []).length > 0 || (staff.fixed_days_off || []).length > 0) ? (
                         <div className="flex flex-col gap-xs">
                           {(staff.avoid_shifts || []).length > 0 && (
                             <span className="text-danger" style={{ fontSize: '0.75rem' }}>
@@ -200,6 +260,11 @@ export default function StaffListPage() {
                           {(staff.avoid_staff || []).length > 0 && (
                             <span className="text-warning" style={{ fontSize: '0.75rem' }}>
                               ⚠️ ไม่อยู่กับ {staff.avoid_staff.length} คน
+                            </span>
+                          )}
+                          {(staff.fixed_days_off || []).length > 0 && (
+                            <span className="text-info" style={{ fontSize: '0.75rem' }}>
+                              🗓️ หยุด: {staff.fixed_days_off.map(d => DAYS_OF_WEEK.find(x => x.value === d)?.label.split(' ')[0]).join(', ')}
                             </span>
                           )}
                         </div>
@@ -231,7 +296,7 @@ export default function StaffListPage() {
               })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="text-center text-muted" style={{ padding: 40 }}>
+                  <td colSpan={9} className="text-center text-muted" style={{ padding: 40 }}>
                     {staffList.length === 0
                       ? '🏥 ยังไม่มีบุคลากร — กดปุ่ม "เพิ่มบุคลากร" เพื่อเริ่มต้น'
                       : '🔍 ไม่พบผลลัพธ์'
@@ -290,16 +355,6 @@ export default function StaffListPage() {
             />
           </div>
         </div>
-        <div className="form-group">
-          <label className="form-label">ชื่อเล่น</label>
-          <input
-            className="form-input"
-            type="text"
-            value={form.nickname}
-            onChange={(e) => handleFormChange('nickname', e.target.value)}
-            placeholder="ชื่อเล่น"
-          />
-        </div>
         <div className="form-row">
           <div className="form-group">
             <label className="form-label">ตำแหน่ง (Position)</label>
@@ -322,6 +377,38 @@ export default function StaffListPage() {
             </select>
           </div>
         </div>
+        <div className="form-row">
+        </div>
+        <div className="form-group">
+          <label className="form-label text-primary">จำกัดจำนวนเวร (Min/Max Shifts)</label>
+          <div className="flex flex-col gap-sm" style={{ marginTop: 4, background: 'var(--color-bg-secondary)', padding: '12px', borderRadius: 8 }}>
+            {shiftTypes.map(shift => (
+              <div key={shift.code} className="flex gap-md items-center">
+                <div style={{ width: 120, fontWeight: 500, fontSize: '0.85rem' }}>เวร {shift.code} ({shift.name})</div>
+                <input
+                  className="form-input"
+                  type="number"
+                  placeholder="ขั้นต่ำ"
+                  value={form.shift_limits?.[shift.code]?.min || ''}
+                  onChange={(e) => handleShiftLimitChange(shift.code, 'min', e.target.value)}
+                  style={{ width: 80, height: 32, fontSize: '0.85rem' }}
+                  min="0"
+                />
+                <span className="text-muted text-xs">ถึง</span>
+                <input
+                  className="form-input"
+                  type="number"
+                  placeholder="สูงสุด"
+                  value={form.shift_limits?.[shift.code]?.max || ''}
+                  onChange={(e) => handleShiftLimitChange(shift.code, 'max', e.target.value)}
+                  style={{ width: 80, height: 32, fontSize: '0.85rem' }}
+                  min="0"
+                />
+              </div>
+            ))}
+            <span className="text-muted text-xs mt-xs">เว้นว่างไว้หากไม่ต้องการจำกัด</span>
+          </div>
+        </div>
         <div className="form-group">
           <label className="form-label text-danger">ไม่ขออยู่เวรนี้ (Avoid Shifts)</label>
           <div className="flex gap-sm" style={{ flexWrap: 'wrap', marginTop: 4 }}>
@@ -333,6 +420,21 @@ export default function StaffListPage() {
                   onChange={(e) => handleCheckboxArrayChange('avoid_shifts', shift.code, e.target.checked)}
                 />
                 <span className="text-sm">{shift.code} ({shift.name})</span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <div className="form-group">
+          <label className="form-label text-info">หยุดประจำสัปดาห์ (Fixed Days Off)</label>
+          <div className="flex gap-sm" style={{ flexWrap: 'wrap', marginTop: 4 }}>
+            {DAYS_OF_WEEK.map(day => (
+              <label key={day.value} className="flex items-center gap-xs" style={{ cursor: 'pointer', padding: '4px 8px', background: 'var(--color-bg-secondary)', borderRadius: 4 }}>
+                <input
+                  type="checkbox"
+                  checked={(form.fixed_days_off || []).includes(day.value)}
+                  onChange={(e) => handleCheckboxArrayChange('fixed_days_off', day.value, e.target.checked)}
+                />
+                <span className="text-sm">{day.label}</span>
               </label>
             ))}
           </div>

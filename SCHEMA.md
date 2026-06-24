@@ -66,6 +66,7 @@ Content-Type: `application/json`
 | `hospital_name` | String | ❌ | ชื่อโรงพยาบาล |
 | `month` | String | ❌ | เดือนที่จัดการล่าสุด (YYYY-MM) |
 | `shift_mode` | String | ❌ | รูปแบบการจัดเวร (8HR, 12HR, MIXED) |
+| `roster_hours` | Number | ❌ | ชั่วโมงการทำงานรวมเป้าหมาย (Roster Hours) สำหรับคำนวณ OT อัตโนมัติ |
 | `max_weekly_hours` | Number | ❌ | จำนวนชั่วโมงทำงานสูงสุดต่อสัปดาห์ |
 | `min_rest_hours` | Number | ❌ | จำนวนชั่วโมงพักผ่อนขั้นต่ำระหว่างเวร |
 | `max_daily_hours` | Number | ❌ | จำนวนชั่วโมงทำงานสูงสุดต่อวัน |
@@ -88,4 +89,4 @@ Content-Type: `application/json`
 | :--- | :---: | :--- |
 | `staffId` | Key (String) | รหัสอ้างอิงของพนักงานที่เป็นเจ้าของตารางเวร |
 | `dayOfMonth` | Key (String) | วันที่ในเดือนนั้นๆ (เช่น "1", "2", ..., "31") |
-| `shiftCode` | Value (String) | รหัสเวรที่พนักงานคนนั้นต้องขึ้นในวันนั้น (เช่น "M", "E", "OFF") |
+| `shiftCode` | Value (String) | รูปแบบ `รหัสเวร` หรือ `รหัสเวร:OT` (เช่น "M", "E:2", "OFF", "TRN:8") |

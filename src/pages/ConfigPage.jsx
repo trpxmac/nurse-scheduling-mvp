@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Settings, Save, RotateCcw, CheckCircle, Clock, Users, Moon, UserX, Plus, Trash2 } from 'lucide-react';
-import { loadConfig, saveConfig, DEFAULT_CONFIG, getMonthName, loadActiveDepartment, saveActiveDepartment, loadDepartments, saveDepartments, loadMonthlySettings, saveMonthlySettings } from '../utils/storage';
+import { loadConfig, saveConfig, DEFAULT_CONFIG, getMonthName, loadActiveDepartment, saveActiveDepartment, loadDepartments, saveDepartments, loadMonthlySettings, saveMonthlySettings, loadStaffList } from '../utils/storage';
 
 export default function ConfigPage() {
   const [config, setConfig] = useState(DEFAULT_CONFIG);
@@ -9,25 +9,64 @@ export default function ConfigPage() {
   const [level1, setLevel1] = useState('RN1');
   const [level2, setLevel2] = useState('RN1');
 
-  const LEVELS = ['RN4', 'RN3', 'RN2', 'RN1', 'PN', 'PA', 'NA'];
+  const LEVELS = ['HOD', 'RN4', 'RN3', 'RN2', 'RN1', 'PN', 'PA', 'NA'];
+  const [hodName, setHodName] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const cfg = loadConfig();
-    setConfig(cfg);
-    setMonthlyConfig(loadMonthlySettings(cfg.month));
+    async function init() {
+      const cfg = await loadConfig();
+      const st = await loadStaffList();
+      
+      const hod = st.find(s => (s.position === 'HOD' || s.level === 'HOD') && s.active);
+      if (hod) {
+        const name = `${hod.firstName} ${hod.lastName}`;
+        setHodName(name);
+        cfg.head_nurse_name = name;
+      }
+
+      setConfig(cfg);
+      setMonthlyConfig(await loadMonthlySettings(cfg.month));
+      setLoading(false);
+    }
+    init();
   }, []);
 
+  if (loading) return <div className="page-container"><div className="card" style={{padding:'40px',textAlign:'center'}}>กำลังโหลดข้อมูล...</div></div>;
+
   const handleChange = (field, value) => {
-    setConfig(prev => ({ ...prev, [field]: value }));
-    setSaved(false);
+    setConfig(prev => {
+      const next = { ...prev, [field]: value };
+      saveConfig(next);
+      return next;
+    });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
     if (field === 'month') {
-      setMonthlyConfig(loadMonthlySettings(value));
+      loadMonthlySettings(value).then(setMonthlyConfig);
+    }
+    if (field === 'unit_name') {
+      const activeDept = loadActiveDepartment();
+      if (activeDept && activeDept.name !== value) {
+        const updatedDept = { ...activeDept, name: value || 'Unnamed Unit' };
+        saveActiveDepartment(updatedDept);
+        loadDepartments().then(depts => {
+          const updatedDepts = depts.map(d => d.id === updatedDept.id ? updatedDept : d);
+          saveDepartments(updatedDepts);
+          window.dispatchEvent(new Event('nss_department_updated'));
+        });
+      }
     }
   };
 
   const handleMonthlyChange = (field, value) => {
-    setMonthlyConfig(prev => ({ ...prev, [field]: value }));
-    setSaved(false);
+    setMonthlyConfig(prev => {
+      const next = { ...prev, [field]: value };
+      saveMonthlySettings(config.month, next);
+      return next;
+    });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
   };
 
   const handleNumberChange = (field, value) => {
@@ -39,15 +78,15 @@ export default function ConfigPage() {
     saveConfig(config);
     saveMonthlySettings(config.month, monthlyConfig);
     
-    // Sync unit_name to department list
     const activeDept = loadActiveDepartment();
     if (activeDept.name !== config.unit_name) {
       const updatedDept = { ...activeDept, name: config.unit_name || 'Unnamed Unit' };
       saveActiveDepartment(updatedDept);
-      const depts = loadDepartments();
-      const updatedDepts = depts.map(d => d.id === updatedDept.id ? updatedDept : d);
-      saveDepartments(updatedDepts);
-      window.dispatchEvent(new Event('nss_department_updated'));
+      loadDepartments().then(depts => {
+        const updatedDepts = depts.map(d => d.id === updatedDept.id ? updatedDept : d);
+        saveDepartments(updatedDepts);
+        window.dispatchEvent(new Event('nss_department_updated'));
+      });
     }
 
     setSaved(true);
@@ -207,7 +246,10 @@ export default function ConfigPage() {
               value={config.head_nurse_name || ''}
               onChange={(e) => handleChange('head_nurse_name', e.target.value)}
               placeholder="ตัวบรรจงชื่อ-สกุล"
+              readOnly={!!hodName}
+              style={hodName ? { opacity: 0.7, background: 'var(--color-bg-secondary)' } : {}}
             />
+            {hodName && <span className="form-hint text-success">✅ ดึงข้อมูลอัตโนมัติจากพนักงานที่เป็น HOD</span>}
           </div>
           <div className="form-group">
             <label className="form-label">ผู้จัดการฝ่าย <code>manager_name</code></label>
@@ -301,6 +343,24 @@ export default function ConfigPage() {
               min="2" max="7"
             />
             <span className="form-hint">ต้องมีวันหยุด — ไม่เกิน {config.max_consecutive_workdays} วันติดต่อกัน</span>
+          </div>
+        </div>
+
+        <div className="form-row" style={{ marginTop: 'var(--space-md)' }}>
+          <div className="form-group">
+            <label className="form-label">ระดับพยาบาลที่จำเป็นต้องมีในทุกเวร <code>required_level_every_shift</code></label>
+            <select
+              className="form-select"
+              value={config.required_level_every_shift || ''}
+              onChange={(e) => handleChange('required_level_every_shift', e.target.value)}
+            >
+              <option value="">ไม่มีข้อกำหนด (ไม่บังคับ)</option>
+              <option value="RN4">RN4 (Senior RN ระดับ 4 ขึ้นไป)</option>
+              <option value="RN3">RN3 (Senior RN ระดับ 3 ขึ้นไป)</option>
+              <option value="RN2">RN2 (Senior RN ระดับ 2 ขึ้นไป)</option>
+              <option value="RN1">RN1 (Junior RN ระดับ 1 ขึ้นไป)</option>
+            </select>
+            <span className="form-hint">เช่น หากเลือก RN4 ระบบจะบังคับให้ในทุกเวรทำงานต้องมีพยาบาลระดับ RN4 อย่างน้อย 1 คนเสมอ</span>
           </div>
         </div>
       </div>
@@ -424,14 +484,20 @@ export default function ConfigPage() {
             <div className="form-group" style={{ marginBottom: 0, width: '120px' }}>
               <label className="form-label text-xs">ระดับที่ 1</label>
               <select className="form-select" value={level1} onChange={(e) => setLevel1(e.target.value)}>
-                {LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
+                <option value="HOD">HOD</option>
+                <option value="RN4">RN4 (Senior RN ระดับ 4)</option>
+                <option value="RN3">RN3 (Senior RN ระดับ 3)</option>
+                {LEVELS.filter(l => l !== 'HOD' && l !== 'RN4' && l !== 'RN3').map(l => <option key={l} value={l}>{l}</option>)}
               </select>
             </div>
             <div className="text-muted text-sm" style={{ paddingBottom: '10px' }}>คู่กับ</div>
             <div className="form-group" style={{ marginBottom: 0, width: '120px' }}>
               <label className="form-label text-xs">ระดับที่ 2</label>
               <select className="form-select" value={level2} onChange={(e) => setLevel2(e.target.value)}>
-                {LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
+                <option value="HOD">HOD</option>
+                <option value="RN4">RN4 (Senior RN ระดับ 4)</option>
+                <option value="RN3">RN3 (Senior RN ระดับ 3)</option>
+                {LEVELS.filter(l => l !== 'HOD' && l !== 'RN4' && l !== 'RN3').map(l => <option key={l} value={l}>{l}</option>)}
               </select>
             </div>
             <button className="btn btn-primary" onClick={handleAddIncompatible} style={{ height: '40px' }}>

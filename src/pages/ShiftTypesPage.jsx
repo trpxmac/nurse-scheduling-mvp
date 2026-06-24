@@ -24,11 +24,17 @@ export default function ShiftTypesPage() {
   const [showModal, setShowModal] = useState(false);
   const [editIndex, setEditIndex] = useState(-1);
   const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(EMPTY_FORM);
 
   useEffect(() => {
-    setShiftTypes(loadShiftTypes());
+    loadShiftTypes().then(types => {
+      setShiftTypes(types);
+      setLoading(false);
+    });
   }, []);
+
+  if (loading) return <div className="page-container"><div className="card" style={{padding:'40px',textAlign:'center'}}>กำลังโหลดข้อมูล...</div></div>;
 
   const handleSave = () => {
     saveShiftTypes(shiftTypes);
@@ -40,11 +46,17 @@ export default function ShiftTypesPage() {
     const updated = [...shiftTypes];
     updated[index] = { ...updated[index], active: !updated[index].active };
     setShiftTypes(updated);
+    saveShiftTypes(updated);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
   };
 
   const handleDelete = (index) => {
     const updated = shiftTypes.filter((_, i) => i !== index);
     setShiftTypes(updated);
+    saveShiftTypes(updated);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
   };
 
   const openAddModal = () => {
@@ -83,11 +95,11 @@ export default function ShiftTypesPage() {
     return (endMin - startMin) / 60;
   };
 
-  const isNoTimeShift = ['OFF', 'LEAVE', 'OTHER'].includes(form.category);
+  const isNoTimeShift = ['OFF', 'LEAVE'].includes(form.category);
 
   const handleSubmitForm = () => {
     if (!form.code || !form.name) return;
-    const hours = isNoTimeShift ? 0 : calcHours(form.start, form.end);
+    const hours = isNoTimeShift ? (Number(form.hours) || 0) : calcHours(form.start, form.end);
     const newShift = {
       id: form.code,
       code: form.code,
@@ -100,13 +112,17 @@ export default function ShiftTypesPage() {
       hex: form.hex,
     };
 
+    let updated;
     if (editIndex >= 0) {
-      const updated = [...shiftTypes];
+      updated = [...shiftTypes];
       updated[editIndex] = newShift;
-      setShiftTypes(updated);
     } else {
-      setShiftTypes(prev => [...prev, newShift]);
+      updated = [...shiftTypes, newShift];
     }
+    setShiftTypes(updated);
+    saveShiftTypes(updated);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
     setShowModal(false);
   };
 
@@ -162,7 +178,7 @@ export default function ShiftTypesPage() {
               {shiftTypes.map((st, idx) => (
                 <tr key={st.code + idx} style={{ opacity: st.active ? 1 : 0.5 }}>
                   <td>
-                    <ShiftBadge code={st.code} />
+                    <ShiftBadge code={st.code} color={st.hex} />
                   </td>
                   <td style={{ fontWeight: 600 }}>{st.name}</td>
                   <td>{st.start || '-'}</td>
@@ -308,7 +324,7 @@ export default function ShiftTypesPage() {
           />
         </div>
 
-        {!isNoTimeShift && (
+        {!isNoTimeShift ? (
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">เวลาเริ่ม</label>
@@ -328,6 +344,19 @@ export default function ShiftTypesPage() {
                 onChange={(e) => handleFormChange('end', e.target.value)}
               />
             </div>
+          </div>
+        ) : (
+          <div className="form-group">
+            <label className="form-label">นับเป็นชั่วโมงทำงาน (ชม.)</label>
+            <input
+              className="form-input"
+              type="number"
+              min="0"
+              max="24"
+              value={form.hours === undefined ? 0 : form.hours}
+              onChange={(e) => handleFormChange('hours', Number(e.target.value))}
+            />
+            <span className="form-hint" style={{ marginTop: 4, display: 'block' }}>เวรที่ไม่กำหนดเวลาเริ่ม-สิ้นสุด สามารถกำหนดจำนวนชั่วโมงที่นับเข้า Roster ได้เอง</span>
           </div>
         )}
 

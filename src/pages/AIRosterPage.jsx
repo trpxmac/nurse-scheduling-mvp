@@ -5,11 +5,11 @@ import {
   loadConfig, loadShiftTypes, loadStaffList,
   loadMonthlyRoster, saveMonthlyRoster, saveAIRoster,
   getDaysInMonth, getDayOfWeek, isWeekend, getMonthName,
-  loadActiveMonth, saveActiveMonth, loadLeaveSchedules,
+  loadActiveMonth, saveActiveMonth, loadLeaveSchedules, loadMonthlySettings
 } from '../utils/storage';
 import MonthSelector from '../components/MonthSelector';
 import { buildShiftTypesMap, calcMonthlyHours } from '../utils/scheduling';
-import { generateAIRoster } from '../utils/aiRoster';
+import { generateAIRoster, checkFeasibility } from '../utils/aiRoster';
 import StatCard from '../components/StatCard';
 
 export default function AIRosterPage() {
@@ -20,7 +20,9 @@ export default function AIRosterPage() {
   const [result, setResult] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [applied, setApplied] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [viewMonth, setViewMonthState] = useState(loadActiveMonth());
+  const [warnings, setWarnings] = useState([]);
 
   const setViewMonth = (m) => {
     setViewMonthState(m);
@@ -28,12 +30,39 @@ export default function AIRosterPage() {
   };
 
   useEffect(() => {
-    const loadedConfig = loadConfig();
-    setConfig(loadedConfig);
-    setShiftTypes(loadShiftTypes());
-    setStaffList(loadStaffList());
-    setViewMonth(loadedConfig.month);
+    async function init() {
+      const loadedConfig = await loadConfig();
+      setConfig(loadedConfig);
+      setShiftTypes(await loadShiftTypes());
+      setStaffList(await loadStaffList());
+      setLoading(false);
+    }
+    init();
   }, []);
+
+  useEffect(() => {
+    async function check() {
+      if (staffList.length === 0 || shiftTypes.length === 0) return;
+      const monthlySettings = await loadMonthlySettings(viewMonth);
+      const aiConfig = { 
+        ...config, 
+        month: viewMonth,
+        roster_hours: monthlySettings.roster_hours || config.roster_hours,
+        holiday_hours: monthlySettings.holiday_hours || config.holiday_hours
+      };
+      const leaveSchedules = await loadLeaveSchedules(viewMonth);
+      const lockedSlots = {};
+      for (const sch of leaveSchedules) {
+        if (!lockedSlots[sch.staffId]) lockedSlots[sch.staffId] = {};
+        for (let d = sch.startDay; d <= sch.endDay; d++) {
+          lockedSlots[sch.staffId][d] = sch.shiftCode;
+        }
+      }
+      const w = checkFeasibility(staffList, shiftTypes, aiConfig, lockedSlots);
+      setWarnings(w);
+    }
+    check();
+  }, [viewMonth, staffList, shiftTypes, config]);
 
   const activeStaff = useMemo(() => staffList.filter(s => s.active), [staffList]);
   const activeShifts = useMemo(() => shiftTypes.filter(s => s.active), [shiftTypes]);
@@ -41,26 +70,34 @@ export default function AIRosterPage() {
   const daysInMonth = useMemo(() => getDaysInMonth(viewMonth), [viewMonth]);
   const days = useMemo(() => Array.from({ length: daysInMonth }, (_, i) => i + 1), [daysInMonth]);
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     setGenerating(true);
     setApplied(false);
-    // Use setTimeout to show loading state
-    setTimeout(() => {
-      const aiConfig = { ...config, month: viewMonth };
-      // Load pre-set leave schedules and build locked slots map
-      const leaveSchedules = loadLeaveSchedules(viewMonth);
-      const lockedSlots = {}; // { [staffId]: { [day]: shiftCode } }
-      for (const sch of leaveSchedules) {
-        if (!lockedSlots[sch.staffId]) lockedSlots[sch.staffId] = {};
-        for (let d = sch.startDay; d <= sch.endDay; d++) {
-          lockedSlots[sch.staffId][d] = sch.shiftCode;
-        }
+    
+    const monthlySettings = await loadMonthlySettings(viewMonth);
+    const aiConfig = { 
+      ...config, 
+      month: viewMonth,
+      roster_hours: monthlySettings.roster_hours || config.roster_hours,
+      holiday_hours: monthlySettings.holiday_hours || config.holiday_hours
+    };
+    // Load pre-set leave schedules and build locked slots map
+    const leaveSchedules = await loadLeaveSchedules(viewMonth);
+    const lockedSlots = {}; // { [staffId]: { [day]: shiftCode } }
+    for (const sch of leaveSchedules) {
+      if (!lockedSlots[sch.staffId]) lockedSlots[sch.staffId] = {};
+      for (let d = sch.startDay; d <= sch.endDay; d++) {
+        lockedSlots[sch.staffId][d] = sch.shiftCode;
       }
+    }
+    
+    // Use setTimeout to allow UI to update to generating state before blocking thread
+    setTimeout(() => {
       const res = generateAIRoster(staffList, shiftTypes, aiConfig, lockedSlots);
       setResult(res);
       saveAIRoster(res);
       setGenerating(false);
-    }, 800);
+    }, 100);
   };
 
   const handleApply = () => {
@@ -91,6 +128,9 @@ export default function AIRosterPage() {
     if (!code || code === '') return 'shift-none';
     return `shift-${code}`;
   };
+
+
+  if (loading) return <div className="page-container"><div className="card" style={{padding:'40px',textAlign:'center'}}>กำลังโหลดข้อมูล...</div></div>;
 
   if (activeStaff.length === 0) {
     return (
@@ -152,13 +192,37 @@ export default function AIRosterPage() {
             <strong>Coverage ขั้นต่ำ:</strong>{' '}
             {config.shift_mode === '12HR' 
               ? `D=${config.required_D_coverage || 0}, N12=${config.required_N12_coverage || 0}`
-              : `M=${config.required_M_coverage || 0}, E=${config.required_E_coverage || 0}, N8=${config.required_N8_coverage || 0}`
+              : config.shift_mode === 'MIXED'
+                ? `M=${config.required_M_coverage || 0}, E=${config.required_E_coverage || 0}, N8=${config.required_N8_coverage || 0}, D=${config.required_D_coverage || 0}, N12=${config.required_N12_coverage || 0}`
+                : `M=${config.required_M_coverage || 0}, E=${config.required_E_coverage || 0}, N8=${config.required_N8_coverage || 0}`
             }
           </span>
           <span><strong>พักขั้นต่ำ:</strong> {config.min_rest_hours} ชม.</span>
           <span><strong>ทำงานสูงสุด/วัน:</strong> {config.max_daily_hours} ชม.</span>
         </div>
       </div>
+
+      {warnings.length > 0 && (
+        <div className="card mb-lg" style={{ background: '#fef2f2', borderColor: '#fca5a5' }}>
+          <div style={{ padding: 'var(--space-md)' }}>
+            <h4 style={{ color: '#991b1b', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 12px 0' }}>
+              <span style={{ fontSize: '1.2rem' }}>⚠️</span> คำเตือนก่อนจัดเวร: อาจเป็นไปไม่ได้ตามเป้าหมาย (Feasibility Warning)
+            </h4>
+            <ul style={{ color: '#7f1d1d', margin: 0, paddingLeft: '24px', fontSize: '0.85rem' }}>
+              {warnings.map((w, i) => (
+                <li key={i} style={{ marginBottom: '8px' }}>
+                  <strong>{w.message}</strong>
+                  <div style={{ opacity: 0.85, marginTop: '2px' }}>{w.details}</div>
+                </li>
+              ))}
+            </ul>
+            <div style={{ marginTop: '12px', padding: '8px', background: 'rgba(153, 27, 27, 0.05)', borderRadius: '4px', fontSize: '0.8rem', color: '#991b1b', fontWeight: 600 }}>
+              💡 คำแนะนำ: ระบบสามารถจัดเวรให้ได้ แต่อาจเกิดละเมิดกฎหมาย (ทำติดเกิน) หรือ Coverage แหว่ง แนะนำให้: 
+              ปรับเพิ่มพนักงาน, ลด Coverage, หรือ เพิ่มจำนวนเวรติดกันสูงสุด ในเมนูการตั้งค่า
+            </div>
+          </div>
+        </div>
+      )}
 
       {!result && !generating && (
         <div className="card">
@@ -193,7 +257,7 @@ export default function AIRosterPage() {
 
       {result && !generating && (
         <>
-          {/* AI Score */}
+          {/* AI Score with Tiered Breakdown */}
           <div className="card mb-lg">
             <div className="ai-score-container">
               <div className={`ai-score-circle ${getScoreClass(result.score)}`}>
@@ -203,6 +267,107 @@ export default function AIRosterPage() {
                 ความสมบูรณ์ของตาราง — {getScoreLabel(result.score)}
               </div>
             </div>
+
+            {/* Tier Breakdown */}
+            {result.scoreBreakdown && (
+              <div style={{ padding: '0 var(--space-xl) var(--space-xl)', display: 'flex', gap: 'var(--space-lg)', flexWrap: 'wrap', justifyContent: 'center' }}>
+                {/* Legal Tier */}
+                <div className="score-tier-card" style={{ '--tier-color': '#ef4444' }}>
+                  <div className="score-tier-header">
+                    <span className="score-tier-icon">⚖️</span>
+                    <span className="score-tier-title">กฎหมายแรงงาน</span>
+                    <span className="score-tier-badge" style={{ background: result.scoreBreakdown.legal >= 80 ? '#dcfce7' : result.scoreBreakdown.legal >= 50 ? '#fef9c3' : '#fee2e2', color: result.scoreBreakdown.legal >= 80 ? '#166534' : result.scoreBreakdown.legal >= 50 ? '#854d0e' : '#991b1b' }}>
+                      {result.scoreBreakdown.legal}%
+                    </span>
+                  </div>
+                  <div className="score-tier-bar-bg">
+                    <div className="score-tier-bar" style={{ width: `${result.scoreBreakdown.legal}%`, background: result.scoreBreakdown.legal >= 80 ? '#22c55e' : result.scoreBreakdown.legal >= 50 ? '#f59e0b' : '#ef4444' }} />
+                  </div>
+                  <div className="score-tier-weight">น้ำหนัก 40%</div>
+                  {result.scoreBreakdown.breakdown.legal.details.length > 0 ? (
+                    <div className="score-tier-details">
+                      {result.scoreBreakdown.breakdown.legal.details.map((d, i) => (
+                        <div key={i} className="score-tier-detail-row">
+                          <span>❌ {d.rule}</span>
+                          <span className="score-tier-count">{d.count} ครั้ง (−{d.penalty})</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="score-tier-details">
+                      <div className="score-tier-detail-row" style={{ color: '#16a34a' }}>
+                        <span>✅ ไม่มีการละเมิดกฎหมาย</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Safety Tier */}
+                <div className="score-tier-card" style={{ '--tier-color': '#f97316' }}>
+                  <div className="score-tier-header">
+                    <span className="score-tier-icon">🛡️</span>
+                    <span className="score-tier-title">ความปลอดภัยบุคลากร</span>
+                    <span className="score-tier-badge" style={{ background: result.scoreBreakdown.safety >= 80 ? '#dcfce7' : result.scoreBreakdown.safety >= 50 ? '#fef9c3' : '#fee2e2', color: result.scoreBreakdown.safety >= 80 ? '#166534' : result.scoreBreakdown.safety >= 50 ? '#854d0e' : '#991b1b' }}>
+                      {result.scoreBreakdown.safety}%
+                    </span>
+                  </div>
+                  <div className="score-tier-bar-bg">
+                    <div className="score-tier-bar" style={{ width: `${result.scoreBreakdown.safety}%`, background: result.scoreBreakdown.safety >= 80 ? '#22c55e' : result.scoreBreakdown.safety >= 50 ? '#f59e0b' : '#ef4444' }} />
+                  </div>
+                  <div className="score-tier-weight">น้ำหนัก 35%</div>
+                  {result.scoreBreakdown.breakdown.safety.details.length > 0 ? (
+                    <div className="score-tier-details">
+                      {result.scoreBreakdown.breakdown.safety.details.map((d, i) => (
+                        <div key={i} className="score-tier-detail-row">
+                          <span>⚠️ {d.rule}</span>
+                          <span className="score-tier-count">
+                            {d.rate !== undefined ? `${d.rate}% ครบ (${d.count}/${d.total} ขาด)` : `${d.count} ครั้ง`}
+                            {' '}(−{d.penalty})
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="score-tier-details">
+                      <div className="score-tier-detail-row" style={{ color: '#16a34a' }}>
+                        <span>✅ Coverage ครบ & ไม่มีเวรติดเกิน</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Quality Tier */}
+                <div className="score-tier-card" style={{ '--tier-color': '#22c55e' }}>
+                  <div className="score-tier-header">
+                    <span className="score-tier-icon">✨</span>
+                    <span className="score-tier-title">คุณภาพตาราง</span>
+                    <span className="score-tier-badge" style={{ background: result.scoreBreakdown.quality >= 80 ? '#dcfce7' : result.scoreBreakdown.quality >= 50 ? '#fef9c3' : '#fee2e2', color: result.scoreBreakdown.quality >= 80 ? '#166534' : result.scoreBreakdown.quality >= 50 ? '#854d0e' : '#991b1b' }}>
+                      {result.scoreBreakdown.quality}%
+                    </span>
+                  </div>
+                  <div className="score-tier-bar-bg">
+                    <div className="score-tier-bar" style={{ width: `${result.scoreBreakdown.quality}%`, background: result.scoreBreakdown.quality >= 80 ? '#22c55e' : result.scoreBreakdown.quality >= 50 ? '#f59e0b' : '#ef4444' }} />
+                  </div>
+                  <div className="score-tier-weight">น้ำหนัก 25%</div>
+                  {result.scoreBreakdown.breakdown.quality.details.length > 0 ? (
+                    <div className="score-tier-details">
+                      {result.scoreBreakdown.breakdown.quality.details.map((d, i) => (
+                        <div key={i} className="score-tier-detail-row">
+                          <span>📊 {d.rule} (SD={d.stdDev})</span>
+                          <span className="score-tier-count">(−{d.penalty})</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="score-tier-details">
+                      <div className="score-tier-detail-row" style={{ color: '#16a34a' }}>
+                        <span>✅ ชั่วโมงกระจายสมดุล</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Summary Stats */}
@@ -238,7 +403,7 @@ export default function AIRosterPage() {
                         key={d}
                         style={{
                           background: isWeekend(viewMonth, d) ? '#fef3c7' : undefined,
-                          minWidth: 44,
+                          minWidth: 36,
                         }}
                       >
                         <div>{d}</div>
@@ -247,7 +412,7 @@ export default function AIRosterPage() {
                         </div>
                       </th>
                     ))}
-                    <th className="total-cell">ชม.</th>
+                    <th className="total-cell" style={{ minWidth: 40 }}>ชม.</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -256,17 +421,19 @@ export default function AIRosterPage() {
                     const totalHours = calcMonthlyHours(staffRoster, shiftTypesMap);
                     return (
                       <tr key={staff.id}>
-                        <td className="staff-name-cell">
-                          <div style={{ fontWeight: 600, fontSize: '0.78rem' }}>{staff.firstName} {staff.nickname ? `(${staff.nickname})` : ''}</div>
-                          <div style={{ fontSize: '0.62rem', color: 'var(--color-text-muted)', fontWeight: 700 }}>{staff.level && staff.level !== '-' ? staff.level : staff.position}</div>
+                        <td className="staff-name-cell" title={`${staff.firstName} ${staff.lastName}`}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 600, fontSize: '0.72rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{staff.firstName} {staff.nickname ? `(${staff.nickname})` : ''}</span>
+                            <span style={{ fontSize: '0.6rem', color: 'var(--color-text-muted)', fontWeight: 700 }}>{staff.level && staff.level !== '-' ? staff.level : staff.position}</span>
+                          </div>
                         </td>
                         {days.map(d => (
                           <td key={d} style={{
                             background: isWeekend(viewMonth, d) ? 'rgba(245,158,11,0.04)' : undefined,
-                            padding: 2,
+                            padding: 0,
                           }}>
                             <div className={`roster-cell-select ${getShiftClass(staffRoster[d])}`}
-                              style={{ padding: '4px 2px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 700, borderRadius: 4, minHeight: 28 }}
+                              style={{ padding: '2px 1px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 700, borderRadius: 4, minHeight: 20 }}
                             >
                               {staffRoster[d] || '-'}
                             </div>

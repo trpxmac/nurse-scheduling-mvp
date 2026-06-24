@@ -23,7 +23,7 @@ export function parseShift(cell) {
  * Get shift hours from shift code using shift types map
  */
 export function getShiftHours(shiftCode, shiftTypesMap) {
-  if (!shiftCode || shiftCode === '-' || shiftCode === '') return 0;
+  if (!shiftCode || shiftCode === '-' || shiftCode === '' || shiftCode.toLowerCase() === 'x') return 0;
   const st = shiftTypesMap[shiftCode];
   return st ? st.hours : 0;
 }
@@ -88,12 +88,17 @@ export function detectQuickReturns(staffRoster, shiftTypesMap, minRestHours, yea
   for (let d = 2; d <= daysInMonth; d++) {
     const { shift: prevShiftCode } = parseShift(staffRoster[d - 1]);
     const { shift: currShiftCode } = parseShift(staffRoster[d]);
-    if (!prevShiftCode || prevShiftCode === '-' || prevShiftCode === '') continue;
-    if (!currShiftCode || currShiftCode === '-' || currShiftCode === '') continue;
+    if (!prevShiftCode || prevShiftCode === '-' || prevShiftCode === '' || prevShiftCode.toLowerCase() === 'x') continue;
+    if (!currShiftCode || currShiftCode === '-' || currShiftCode === '' || currShiftCode.toLowerCase() === 'x') continue;
 
     const prevShift = shiftTypesMap[prevShiftCode];
     const currShift = shiftTypesMap[currShiftCode];
     if (!prevShift || !currShift) continue;
+
+    // Skip shifts that have no start or end time (e.g. OFF, LEAVE, OTHER)
+    if (!prevShift.start || !prevShift.end || !currShift.start || !currShift.end) {
+      continue;
+    }
 
     const prevEnd = timeToMinutes(prevShift.end);
     const currStart = timeToMinutes(currShift.start);
@@ -148,15 +153,13 @@ export function calcDailyCoverage(roster, activeStaffIds, shiftTypesMap) {
     coverage[day] = {};
     // Initialize all shift codes to 0
     for (const code of Object.keys(shiftTypesMap)) {
-      if (code !== '-') coverage[day][code] = 0;
+      if (code !== '-' && code.toLowerCase() !== 'x') coverage[day][code] = 0;
     }
 
     for (const staffId of activeStaffIds) {
       const { shift } = parseShift(roster[staffId]?.[day]);
-      if (shift && shift !== '-' && shift !== '') {
-        if (coverage[day][shift] !== undefined) {
-          coverage[day][shift]++;
-        }
+      if (shift && shift !== '-' && shift.toLowerCase() !== 'x' && coverage[day][shift] !== undefined) {
+        coverage[day][shift]++;
       }
     }
   }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { CalendarDays, Save, CheckCircle, Info, X, ExternalLink } from 'lucide-react';
+import { CalendarDays, Save, CheckCircle, Info, X, ExternalLink, Copy, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import {
   loadStaffList, loadShiftTypes, loadLeaveSchedules, saveLeaveSchedules,
@@ -19,6 +19,7 @@ export default function LeaveSchedulePage() {
   // cellMap: { [staffId]: { [day]: shiftCode | '' } }
   const [cellMap, setCellMap] = useState({});
   const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
   // Popup state
   const [popup, setPopup] = useState(null); // { staffId, day, x, y }
 
@@ -28,26 +29,27 @@ export default function LeaveSchedulePage() {
   };
 
   useEffect(() => {
-    setStaffList(loadStaffList());
-    setShiftTypes(loadShiftTypes());
-  }, []);
-
-  useEffect(() => {
-    // Load and convert flat schedule list to cellMap
-    const schedules = loadLeaveSchedules(viewMonth);
-    const map = {};
-    for (const sch of schedules) {
-      if (!map[sch.staffId]) map[sch.staffId] = {};
-      for (let d = sch.startDay; d <= sch.endDay; d++) {
-        map[sch.staffId][d] = sch.shiftCode;
+    async function init() {
+      setStaffList(await loadStaffList());
+      setShiftTypes(await loadShiftTypes());
+      const schedules = await loadLeaveSchedules(viewMonth);
+      const map = {};
+      for (const sch of schedules) {
+        if (!map[sch.staffId]) map[sch.staffId] = {};
+        for (let d = sch.startDay; d <= sch.endDay; d++) {
+          map[sch.staffId][d] = sch.shiftCode;
+        }
       }
+      setCellMap(map);
+      setLoading(false);
     }
-    setCellMap(map);
+    init();
   }, [viewMonth]);
+
 
   const activeStaff = useMemo(() => staffList.filter(s => s.active), [staffList]);
   const leaveShifts = useMemo(
-    () => shiftTypes.filter(s => s.active && (s.category === 'LEAVE' || s.category === 'OTHER')),
+    () => shiftTypes.filter(s => s.active && s.code !== '-'),
     [shiftTypes]
   );
   const daysInMonth = useMemo(() => getDaysInMonth(viewMonth), [viewMonth]);
@@ -123,13 +125,46 @@ export default function LeaveSchedulePage() {
           staffDays[d] = shiftCode;
         }
       }
+      
+      let nextMap;
       if (Object.keys(staffDays).length === 0) {
-        const next = { ...prev };
-        delete next[staffId];
-        return next;
+        nextMap = { ...prev };
+        delete nextMap[staffId];
+      } else {
+        nextMap = { ...prev, [staffId]: staffDays };
       }
-      return { ...prev, [staffId]: staffDays };
+      
+      // Auto-save logic
+      const schedules = [];
+      for (const [sId, daysObj] of Object.entries(nextMap)) {
+        const dayNums = Object.keys(daysObj).map(Number).sort((a, b) => a - b);
+        let i = 0;
+        while (i < dayNums.length) {
+          const code = daysObj[dayNums[i]];
+          if (!code) { i++; continue; }
+          let j = i;
+          while (
+            j + 1 < dayNums.length &&
+            dayNums[j + 1] === dayNums[j] + 1 &&
+            daysObj[dayNums[j + 1]] === code
+          ) j++;
+          schedules.push({
+            id: 'L' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 4).toUpperCase(),
+            staffId: sId,
+            shiftCode: code,
+            startDay: dayNums[i],
+            endDay: dayNums[j],
+            note: '',
+          });
+          i = j + 1;
+        }
+      }
+      saveLeaveSchedules(viewMonth, schedules);
+      
+      return nextMap;
     });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
     setPopup(null);
   };
 
@@ -146,15 +181,29 @@ export default function LeaveSchedulePage() {
     return count;
   }, [cellMap]);
 
+  const handleClearAll = () => {
+    if (window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการ "ล้างข้อมูลทั้งหมด" ในเดือนนี้?\n(การกระทำนี้ไม่สามารถย้อนกลับได้)`)) {
+      saveLeaveSchedules(viewMonth, []);
+      setCellMap({});
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    }
+  };
+
+  if (loading) return <div className="page-container"><div className="card" style={{padding:'40px',textAlign:'center'}}>กำลังโหลดข้อมูล...</div></div>;
+
   return (
     <div className="animate-fade-in" onClick={() => setPopup(null)}>
       <div className="page-header">
         <div className="page-header-left">
-          <h1>📅 กำหนดช่วงลา/อบรม</h1>
-          <p>{getMonthName(viewMonth)} — คลิกที่ช่องวันที่เพื่อกำหนดประเภทลา</p>
+          <h1>📅 กำหนดช่วงลา/อบรม/ล็อคเวร</h1>
+          <p>{getMonthName(viewMonth)} — คลิกที่ช่องวันที่เพื่อกำหนดประเภทลาหรือล็อคเวรล่วงหน้า</p>
         </div>
         <div className="page-header-actions">
           <MonthSelector value={viewMonth} onChange={(m) => { setViewMonth(m); }} />
+          <button className="btn btn-ghost" onClick={handleClearAll} style={{ color: 'var(--color-danger)', padding: '0 8px' }} title="ล้างข้อมูลเดือนนี้ทั้งหมด">
+            <Trash2 size={16} /> <span className="hide-mobile">ล้างข้อมูล</span>
+          </button>
           <button className="btn btn-primary" onClick={handleSave}>
             {saved ? <CheckCircle size={16} /> : <Save size={16} />}
             {saved ? 'บันทึกแล้ว!' : 'บันทึก'}
@@ -171,16 +220,12 @@ export default function LeaveSchedulePage() {
       }}>
         <Info size={18} style={{ color: 'var(--color-primary)', marginTop: 2, flexShrink: 0 }} />
         <div style={{ fontSize: '0.85rem', lineHeight: 1.6 }}>
-          <strong>วิธีใช้:</strong> คลิกที่ช่องวันที่ของพนักงานเพื่อเลือกประเภทลา คลิกอีกครั้งเพื่อเปลี่ยน หรือเลือก "ล้าง" เพื่อยกเลิก — กด <strong>บันทึก</strong> ก่อน Generate ตารางเวร
+          <strong>วิธีใช้:</strong> คลิกที่ช่องวันที่ของพนักงานเพื่อเลือกเวร/ประเภทลา คลิกอีกครั้งเพื่อเปลี่ยน หรือเลือก "ล้าง" เพื่อยกเลิก — กด <strong>บันทึก</strong> ก่อน Generate ตารางเวร
           {totalLeaveDays > 0 && <span style={{ marginLeft: 8, color: 'var(--color-accent)', fontWeight: 700 }}>
             ✅ {totalLeaveDays} วันที่กำหนดไว้แล้ว
           </span>}
           <span style={{ display: 'block', marginTop: 4 }}>
-            💡 ต้องการเพิ่มประเภทลาใหม่ (เช่น ลาคลอด)? ไปที่
-            <Link to="/shift-types" style={{ color: 'var(--color-primary)', fontWeight: 600, marginLeft: 4 }}>
-              ประเภทเวร <ExternalLink size={12} style={{ verticalAlign: 'middle' }} />
-            </Link>
-            {' '}แล้วกด "+ เพิ่มประเภท" ตั้ง Category เป็น <strong>LEAVE</strong> หรือ <strong>OTHER</strong>
+            💡 ข้อมูลที่กำหนดในหน้านี้จะถูก "ล็อค" ไว้เมื่อระบบ AI จัดเวรอัตโนมัติ สามารถใช้เพื่อล็อคเวรทำงาน (M, E, D, N) หรือกำหนดวันลา/วันหยุดประจำได้
           </span>
         </div>
       </div>
@@ -247,11 +292,6 @@ export default function LeaveSchedulePage() {
                     <div style={{ fontWeight: 600, fontSize: '0.82rem' }}>
                       {staff.firstName} {staff.lastName}
                     </div>
-                    {staff.nickname && (
-                      <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>
-                        ({staff.nickname})
-                      </div>
-                    )}
                   </td>
                   {/* Position cell */}
                   <td style={{
@@ -265,19 +305,68 @@ export default function LeaveSchedulePage() {
                       {staff.level && staff.level !== '-' ? staff.level : staff.position}
                     </span>
                   </td>
-                  {/* Day cells — group consecutive same-code days into a spanning bar */}
                   {(() => {
                     const cells = [];
                     let d = 1;
                     const staffDays = cellMap[staff.id] || {};
+                    
+                    const actualDays = {};
+                    const [year, month] = viewMonth.split('-').map(Number);
+                    for (let i = 1; i <= daysInMonth; i++) {
+                      if (staffDays[i]) {
+                        actualDays[i] = staffDays[i];
+                      } else if (staff.fixed_days_off && staff.fixed_days_off.length > 0) {
+                        const date = new Date(year, month - 1, i);
+                        if (staff.fixed_days_off.includes(date.getDay())) {
+                          actualDays[i] = 'FIXED_OFF';
+                        }
+                      }
+                    }
+
                     while (d <= daysInMonth) {
-                      const shiftCode = staffDays[d] || '';
-                      if (shiftCode) {
+                      const shiftCode = actualDays[d] || '';
+                      if (shiftCode === 'FIXED_OFF') {
+                        let span = 1;
+                        while (d + span <= daysInMonth && actualDays[d + span] === 'FIXED_OFF') span++;
+                        
+                        const startDay = d;
+                        const spanLen = span;
+                        cells.push(
+                          <td
+                            key={startDay}
+                            colSpan={spanLen}
+                            onClick={(e) => handleCellClick(e, staff.id, startDay)}
+                            title={`${staff.firstName} — หยุดประจำสัปดาห์ วันที่ ${startDay}${spanLen > 1 ? `–${startDay + spanLen - 1}` : ''}`}
+                            style={{
+                              padding: '3px 0',
+                              cursor: 'pointer',
+                              borderBottom: '1px solid var(--border-color-light)',
+                            }}
+                          >
+                            <div style={{
+                              background: 'var(--color-bg-secondary)',
+                              border: '1px dashed var(--border-color)',
+                              margin: '0 1px',
+                              height: 26,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: spanLen === 1 ? '0.6rem' : '0.65rem',
+                              fontWeight: 600,
+                              color: 'var(--color-text-muted)',
+                              borderRadius: 6,
+                            }}>
+                              หยุดประจำ
+                            </div>
+                          </td>
+                        );
+                        d += span;
+                      } else if (shiftCode) {
                         // Find how many consecutive days share the same code
                         let span = 1;
                         while (
                           d + span <= daysInMonth &&
-                          staffDays[d + span] === shiftCode
+                          actualDays[d + span] === shiftCode
                         ) span++;
                         const color = getShiftColor(shiftCode);
                         const shiftObj = leaveShifts.find(s => s.code === shiftCode);
@@ -346,7 +435,7 @@ export default function LeaveSchedulePage() {
                           <td
                             key={emptyDay}
                             onClick={(e) => handleCellClick(e, staff.id, emptyDay)}
-                            title={`คลิกเพื่อกำหนดลา วันที่ ${emptyDay}`}
+                            title={`คลิกเพื่อล็อคเวร/ลา วันที่ ${emptyDay}`}
                             style={{
                               padding: '2px 1px',
                               textAlign: 'center',
@@ -393,7 +482,7 @@ export default function LeaveSchedulePage() {
             onClick={e => e.stopPropagation()}
             style={{
               position: 'fixed',
-              top: Math.min(popup.y, window.innerHeight - 340),
+              top: Math.min(popup.y, window.innerHeight - 420),
               left: Math.min(popup.x, window.innerWidth - 260),
               zIndex: 999,
               background: 'var(--color-bg-primary)',
@@ -406,12 +495,12 @@ export default function LeaveSchedulePage() {
           >
             {/* Header */}
             <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid var(--border-color-light)' }}>
-              📅 วันที่ {popup.day} — กำหนดช่วงลา
+              📅 วันที่ {popup.day} — กำหนดเวร/ช่วงลา
             </div>
 
             {/* End day range */}
             <div style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginBottom: 4 }}>ช่วงวันที่ลา</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginBottom: 4 }}>ช่วงวันที่</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>วันที่ {popup.day}</span>
                 <span style={{ color: 'var(--color-text-muted)' }}>ถึง</span>
@@ -435,7 +524,7 @@ export default function LeaveSchedulePage() {
 
             {/* Leave type buttons */}
             <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginBottom: 6 }}>เลือกประเภท แล้วกดเพื่อยืนยัน</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 280, overflowY: 'auto', paddingRight: 4 }}>
               {leaveShifts.map(s => (
                 <button
                   key={s.code}

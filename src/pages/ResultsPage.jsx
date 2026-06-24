@@ -29,6 +29,7 @@ export default function ResultsPage() {
   const [selectedValidationStaff, setSelectedValidationStaff] = useState(null);
   const [viewMonth, setViewMonthState] = useState(loadActiveMonth());
   const [monthlySettings, setMonthlySettings] = useState({ roster_hours: 0, holiday_hours: 0 });
+  const [loading, setLoading] = useState(true);
 
   const setViewMonth = (m) => {
     setViewMonthState(m);
@@ -36,22 +37,29 @@ export default function ResultsPage() {
   };
 
   useEffect(() => {
-    setConfig(loadConfig());
-    setShiftTypes(loadShiftTypes());
-    setStaffList(loadStaffList());
-    const month = loadActiveMonth();
-    setViewMonth(month);
-    setRoster(loadMonthlyRoster(month));
-    setMonthlySettings(loadMonthlySettings(month));
+    async function init() {
+      setConfig(await loadConfig());
+      setShiftTypes(await loadShiftTypes());
+      setStaffList(await loadStaffList());
+      const month = loadActiveMonth();
+      setViewMonth(month);
+      setRoster(await loadMonthlyRoster(month));
+      setMonthlySettings(await loadMonthlySettings(month));
+      setLoading(false);
+    }
+    init();
   }, []);
 
   // Reload roster when viewMonth changes
   useEffect(() => {
-    if (viewMonth) {
-      setRoster(loadMonthlyRoster(viewMonth));
-      setMonthlySettings(loadMonthlySettings(viewMonth));
+    if (viewMonth && !loading) {
+      async function reload() {
+        setRoster(await loadMonthlyRoster(viewMonth));
+        setMonthlySettings(await loadMonthlySettings(viewMonth));
+      }
+      reload();
     }
-  }, [viewMonth]);
+  }, [viewMonth, loading]);
 
   const activeStaff = useMemo(() => staffList.filter(s => s.active), [staffList]);
   const activeShifts = useMemo(() => filterActiveShifts(shiftTypes, config.shift_mode), [shiftTypes, config.shift_mode]);
@@ -230,6 +238,8 @@ export default function ResultsPage() {
     { id: 'coverage', label: '🏥 Daily Coverage' },
   ];
 
+  if (loading) return <div className="page-container"><div className="card" style={{padding:'40px',textAlign:'center'}}>กำลังโหลดข้อมูล...</div></div>;
+
   return (
     <div className="animate-fade-in">
       <div className="page-header">
@@ -387,7 +397,7 @@ export default function ResultsPage() {
                   <th>ตำแหน่ง</th>
                   {activeShifts.map(st => (
                     <th key={st.code} style={{ textAlign: 'center' }}>
-                      <ShiftBadge code={st.code} />
+                      <ShiftBadge code={st.code} color={st.hex} />
                       <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginTop: '2px', fontWeight: 'normal' }}>
                         {(st.start && st.end) ? `${st.start}-${st.end}` : ''}
                       </div>

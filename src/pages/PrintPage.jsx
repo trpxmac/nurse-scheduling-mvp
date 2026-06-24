@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, Fragment } from 'react';
 import { Printer, ArrowLeft } from 'lucide-react';
 import {
   loadConfig, loadShiftTypes, loadStaffList, loadMonthlyRoster,
-  getDaysInMonth, getMonthName, getDayOfWeek, isWeekend
+  getDaysInMonth, getMonthName, getDayOfWeek, isWeekend, loadMonthlySettings, loadActiveMonth
 } from '../utils/storage';
 import { buildShiftTypesMap, calcMonthlyHours, parseShift, filterActiveShifts } from '../utils/scheduling';
 import './PrintPage.css';
@@ -13,6 +13,7 @@ export default function PrintPage() {
   const activeShiftTypes = useMemo(() => filterActiveShifts(shiftTypes, config.shift_mode), [shiftTypes, config.shift_mode]);
   const [staffList, setStaffList] = useState([]);
   const [roster, setRoster] = useState({});
+  const [monthlySettings, setMonthlySettings] = useState({});
 
   useEffect(() => {
     // Add gray body background class on mount, remove on unmount
@@ -21,13 +22,15 @@ export default function PrintPage() {
   }, []);
 
   useEffect(() => {
-    const loadAllData = () => {
-      const currentConfig = loadConfig();
-      setConfig(currentConfig);
-      setShiftTypes(loadShiftTypes());
-      const allStaff = loadStaffList();
+    const loadAllData = async () => {
+      const activeMonth = loadActiveMonth();
+      const currentConfig = await loadConfig();
+      setConfig({ ...currentConfig, month: activeMonth });
+      setMonthlySettings(await loadMonthlySettings(activeMonth));
+      setShiftTypes(await loadShiftTypes());
+      const allStaff = await loadStaffList();
       setStaffList(allStaff);
-      setRoster(loadMonthlyRoster(currentConfig.month));
+      setRoster(await loadMonthlyRoster(activeMonth));
     };
 
     loadAllData();
@@ -38,6 +41,12 @@ export default function PrintPage() {
   }, []);
 
   const activeStaff = useMemo(() => staffList.filter(s => s.active), [staffList]);
+  
+  const headNurseName = useMemo(() => {
+    if (config.head_nurse_name) return config.head_nurse_name;
+    const hod = staffList.find(s => (s.position === 'HOD' || s.level === 'HOD') && s.active);
+    return hod ? `${hod.firstName} ${hod.lastName}` : '';
+  }, [config.head_nurse_name, staffList]);
 
   const shiftTypesMap = useMemo(() => buildShiftTypesMap(shiftTypes), [shiftTypes]);
   const daysInMonth = useMemo(() => getDaysInMonth(config.month), [config.month]);
@@ -79,7 +88,7 @@ export default function PrintPage() {
                 <div className="print-title-container">
                   <h2>ตารางเวรปฏิบัติงานแผนก ........... {config.unit_name} ...........</h2>
                   <div className="print-subtitle">
-                    เดือน ........ {getMonthName(config.month)} ........ Roster ..... {config.roster_hours || '...............'} ..... ชม. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (Holiday ..... {config.holiday_hours || '...............'} ..... ชม.)
+                    เดือน ........ {getMonthName(config.month)} ........ Roster ..... {monthlySettings.roster_hours || '...............'} ..... ชม. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (Holiday ..... {monthlySettings.holiday_hours || '...............'} ..... ชม.)
                   </div>
                 </div>
               </div>
@@ -107,7 +116,7 @@ export default function PrintPage() {
             let totalRLV = 0;
             let totalADM = 0;
 
-            const reqHrs = Number(config.roster_hours) || 0;
+            const reqHrs = Number(monthlySettings.roster_hours) || 0;
             const targetHrs = reqHrs;
 
             for (let d = 1; d <= daysInMonth; d++) {
@@ -175,7 +184,7 @@ export default function PrintPage() {
         <div className="signature-section" style={{ width: '100%', justifyContent: 'flex-end', gap: '80px', paddingRight: '40px' }}>
           <div className="sig-box">
             <div className="sig-line"></div>
-            <div className="sig-name">({config.head_nurse_name ? ` ${config.head_nurse_name} ` : '................................................'})</div>
+            <div className="sig-name">({headNurseName ? ` ${headNurseName} ` : '................................................'})</div>
             <div className="sig-title">หัวหน้าแผนก</div>
           </div>
           <div className="sig-box">

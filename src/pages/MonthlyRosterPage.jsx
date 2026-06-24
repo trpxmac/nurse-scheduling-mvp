@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { CalendarDays, Save, CheckCircle, Sparkles, RotateCcw, Printer } from 'lucide-react';
+import { CalendarDays, Save, CheckCircle, Sparkles, RotateCcw, Printer, X, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import {
   loadConfig, loadShiftTypes, loadStaffList,
@@ -21,9 +21,11 @@ export default function MonthlyRosterPage() {
   const [staffList, setStaffList] = useState([]);
   const [roster, setRoster] = useState({});
   const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [viewMonth, setViewMonthState] = useState(loadActiveMonth());
   const [monthlySettings, setMonthlySettings] = useState({});
   const [dialog, setDialog] = useState({ isOpen: false, type: 'CONFIRM', title: '', message: '', onConfirm: null, danger: false });
+  const [selectedStaffForModal, setSelectedStaffForModal] = useState(null);
 
   const closeDialog = () => setDialog(prev => ({ ...prev, isOpen: false }));
 
@@ -33,24 +35,32 @@ export default function MonthlyRosterPage() {
   };
 
   useEffect(() => {
-    const loadedConfig = loadConfig();
-    setConfig(loadedConfig);
-    setShiftTypes(loadShiftTypes());
-    setStaffList(loadStaffList());
-    const month = loadActiveMonth();
-    setViewMonth(month);
-    setRoster(loadMonthlyRoster(month));
-    setMonthlySettings(loadMonthlySettings(month) || {});
+    async function init() {
+      const loadedConfig = await loadConfig();
+      setConfig(loadedConfig);
+      setShiftTypes(await loadShiftTypes());
+      setStaffList(await loadStaffList());
+      const month = loadActiveMonth();
+      setViewMonth(month);
+      setRoster(await loadMonthlyRoster(month));
+      setMonthlySettings(await loadMonthlySettings(month) || {});
+      setLoading(false);
+    }
+    init();
   }, []);
 
   // Reload roster when viewMonth changes
   useEffect(() => {
-    if (viewMonth) {
-      setRoster(loadMonthlyRoster(viewMonth));
-      setMonthlySettings(loadMonthlySettings(viewMonth) || {});
-      setSaved(false);
+    if (viewMonth && !loading) {
+      async function reload() {
+        setRoster(await loadMonthlyRoster(viewMonth));
+        setMonthlySettings(await loadMonthlySettings(viewMonth) || {});
+        setSaved(false);
+      }
+      reload();
     }
-  }, [viewMonth]);
+  }, [viewMonth, loading]);
+
 
   const activeStaff = useMemo(() => staffList.filter(s => s.active), [staffList]);
   const activeShifts = useMemo(() => filterActiveShifts(shiftTypes, config.shift_mode), [shiftTypes, config.shift_mode]);
@@ -114,12 +124,15 @@ export default function MonthlyRosterPage() {
     setRoster(prev => {
       const staffRoster = prev[staffId] || {};
       const val = `${shift}\n${ot}\n${otType}`;
-      return {
+      const nextRoster = {
         ...prev,
         [staffId]: { ...staffRoster, [day]: val }
       };
+      saveMonthlyRoster(nextRoster, viewMonth);
+      return nextRoster;
     });
-    setSaved(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
   };
 
   const handleSave = () => {
@@ -149,6 +162,8 @@ export default function MonthlyRosterPage() {
     return `shift-${code}`;
   };
 
+  if (loading) return <div className="page-container"><div className="card" style={{padding:'40px',textAlign:'center'}}>กำลังโหลดข้อมูล...</div></div>;
+
   if (activeStaff.length === 0) {
     return (
       <div className="animate-fade-in">
@@ -170,10 +185,10 @@ export default function MonthlyRosterPage() {
 
   return (
     <div className="animate-fade-in">
-      <div className="page-header">
-        <div className="page-header-left">
-          <h1>📅 จัดตารางเวร</h1>
-          <p>{config.unit_name ? `${config.unit_name} — ` : ''}{config.hospital_name} | บุคลากร {activeStaff.length} คน | {daysInMonth} วัน</p>
+      <div className="page-header" style={{ marginBottom: '8px' }}>
+        <div className="page-header-left" style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
+          <h1 style={{ fontSize: '1.2rem', margin: 0 }}>📅 จัดตารางเวร</h1>
+          <p style={{ margin: 0, fontSize: '0.8rem' }}>{config.unit_name ? `${config.unit_name} — ` : ''}{config.hospital_name} | บุคลากร {activeStaff.length} คน | {daysInMonth} วัน</p>
         </div>
         <div className="page-header-actions">
           <MonthSelector value={viewMonth} onChange={setViewMonth} />
@@ -191,23 +206,23 @@ export default function MonthlyRosterPage() {
       </div>
 
       {/* Shift Legend */}
-      <div className="card mb-lg" style={{ padding: 'var(--space-sm) var(--space-md)' }}>
-        <div className="flex gap-md items-center" style={{ flexWrap: 'wrap', fontSize: '0.8rem' }}>
+      <div className="card" style={{ padding: '6px 12px', marginBottom: '8px' }}>
+        <div className="flex gap-md items-center" style={{ flexWrap: 'wrap', fontSize: '0.75rem' }}>
           <span className="text-muted font-bold">ประเภทเวร:</span>
           {activeShifts.map(st => (
-            <span key={st.code} className={`badge badge-${st.code}`}>
+            <span key={st.code} className={`badge badge-${st.code}`} style={st.hex ? { backgroundColor: `${st.hex}35`, color: '#1e293b', borderColor: `${st.hex}60` } : {}}>
               {st.code} ({st.hours > 0 ? `${st.start}-${st.end}` : st.name.split(' (')[0]})
             </span>
           ))}
           <span style={{ marginLeft: 'auto', borderLeft: '1px solid var(--border-color)', paddingLeft: 16 }}>
-            <span className="text-muted font-bold" style={{ fontSize: '0.75rem' }}>หมายเหตุ:</span>
-            <span className="text-muted" style={{ marginLeft: 4, fontSize: '0.75rem' }}>ช่อง OT สามารถพิมพ์ตัวอักษรต่อท้ายได้ เช่น <strong>8R</strong>=RLV, <strong>8A</strong>=ADM</span>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-primary)' }}>หมายเหตุ:</span>
+            <span style={{ marginLeft: 6, fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>ยอด OT จะถูกคำนวณอัตโนมัติเมื่อชั่วโมงเวรรวมเกินเป้าหมาย (Roster Hours)</span>
           </span>
         </div>
       </div>
 
       {/* Roster Grid */}
-      <div className="card" style={{ padding: 'var(--space-sm)' }}>
+      <div className="card" style={{ padding: '4px' }}>
         <div className="roster-grid">
           <table className="roster-table">
             <thead>
@@ -218,7 +233,7 @@ export default function MonthlyRosterPage() {
                     key={d}
                     style={{
                       background: isWeekend(viewMonth, d) ? '#fef3c7' : undefined,
-                      minWidth: 54,
+                      minWidth: 36,
                     }}
                   >
                     <div>{d}</div>
@@ -227,8 +242,8 @@ export default function MonthlyRosterPage() {
                     </div>
                   </th>
                 ))}
-                <th className="total-cell" style={{ minWidth: 46, borderLeft: '1px solid var(--border-color)' }}>ชม.เวร</th>
-                <th className="total-cell" style={{ minWidth: 46, color: '#9ca3af' }}>OT</th>
+                <th className="total-cell" style={{ minWidth: 40, borderLeft: '1px solid var(--border-color)' }}>ชม.เวร</th>
+                <th className="total-cell" style={{ minWidth: 40, color: '#9ca3af' }}>OT</th>
               </tr>
             </thead>
             <tbody>
@@ -248,9 +263,14 @@ export default function MonthlyRosterPage() {
 
                 return (
                   <tr key={staff.id}>
-                    <td className="staff-name-cell" title={`${staff.firstName} ${staff.lastName}`}>
-                          <div style={{ fontWeight: 600, fontSize: '0.78rem' }}>{staff.firstName} {staff.nickname ? `(${staff.nickname})` : ''}</div>
-                          <div style={{ fontSize: '0.62rem', color: 'var(--color-text-muted)', fontWeight: 700 }}>{staff.level && staff.level !== '-' ? staff.level : staff.position}</div>
+                    <td className="staff-name-cell hover-bg-light" title={`คลิกเพื่อดูตารางเวรของ ${staff.firstName} ${staff.lastName}`} onClick={() => setSelectedStaffForModal(staff)} style={{ cursor: 'pointer', transition: 'background 0.2s' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontWeight: 600, fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Search size={12} style={{ color: 'var(--color-primary)', opacity: 0.7 }} />
+                          {staff.firstName} {staff.lastName}
+                        </span>
+                        <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', fontWeight: 700, flexShrink: 0 }}>{staff.level && staff.level !== '-' ? staff.level : staff.position}</span>
+                      </div>
                     </td>
                     {days.map(d => (
                       <td
@@ -268,7 +288,12 @@ export default function MonthlyRosterPage() {
                                 className={`roster-cell-select ${getShiftClass(shift)}`}
                                 value={shift}
                                 onChange={(e) => handleShiftChange(staff.id, d, { shift: e.target.value, ot: 0, otType: '' })}
-                                style={{ width: '100%', height: '100%', border: 'none', background: 'transparent' }}
+                                style={{
+                                  width: '100%', height: '100%', border: 'none',
+                                  background: shift && shift !== '-' && shiftTypesMap[shift]?.hex ? `${shiftTypesMap[shift].hex}35` : 'transparent',
+                                  color: shift && shift !== '-' ? '#1e293b' : 'inherit',
+                                  fontWeight: shift && shift !== '-' ? '700' : 'normal'
+                                }}
                               >
                                 <option value="">-</option>
                                 {activeShifts.map(st => (
@@ -303,7 +328,7 @@ export default function MonthlyRosterPage() {
                 return (
                   <tr key={`cov-${shiftCode}`} className="coverage-row">
                     <td className="staff-name-cell" style={{ background: 'var(--color-bg-tertiary)' }}>
-                      <span className={`badge badge-${shiftCode}`} style={{ marginRight: 4 }}>{shiftCode}</span>
+                      <span className={`badge badge-${shiftCode}`} style={{ ...(shiftTypesMap[shiftCode]?.hex ? { backgroundColor: `${shiftTypesMap[shiftCode].hex}35`, color: '#1e293b', borderColor: `${shiftTypesMap[shiftCode].hex}60` } : {}), marginRight: 4 }}>{shiftCode}</span>
                       <span style={{ fontSize: '0.68rem' }}>ขั้นต่ำ {required}</span>
                     </td>
                     {days.map(d => {
@@ -323,7 +348,7 @@ export default function MonthlyRosterPage() {
 
               {/* Staff Count by Role Rows */}
               {activeRoles.map(role => (
-                <tr key={`role-count-${role}`} className="coverage-row" style={{ opacity: 0.85, height: '32px' }}>
+                <tr key={`role-count-${role}`} className="coverage-row" style={{ opacity: 0.85, height: '24px' }}>
                   <td className="staff-name-cell" style={{ background: 'var(--color-bg-tertiary)', textAlign: 'right', paddingRight: '12px' }}>
                     <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{role}</span>
                   </td>
@@ -338,7 +363,7 @@ export default function MonthlyRosterPage() {
               ))}
               
               {/* Total Staff Row */}
-              <tr className="coverage-row" style={{ background: 'rgba(59,130,246,0.05)', height: '36px' }}>
+              <tr className="coverage-row" style={{ background: 'rgba(59,130,246,0.05)', height: '28px' }}>
                 <td className="staff-name-cell" style={{ textAlign: 'right', paddingRight: '12px' }}>
                   <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-primary-dark)' }}>Total</span>
                 </td>
@@ -354,6 +379,104 @@ export default function MonthlyRosterPage() {
           </table>
         </div>
       </div>
+
+      {/* Individual Staff Roster Modal */}
+      {selectedStaffForModal && (
+        <div className="modal-overlay" onClick={() => setSelectedStaffForModal(null)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="modal-content animate-scale card" onClick={e => e.stopPropagation()} style={{ maxWidth: '750px', width: '90%', padding: 'var(--space-lg)' }}>
+            <div className="flex justify-between items-center mb-md pb-sm" style={{ borderBottom: '1px solid var(--border-color)' }}>
+              <h3 style={{ fontSize: '1.2rem', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <CalendarDays size={20} /> ตารางเวร: {selectedStaffForModal.firstName} {selectedStaffForModal.lastName}
+              </h3>
+              <div className="flex gap-sm">
+                 <button className="btn btn-ghost btn-sm" onClick={() => {
+                   const idx = activeStaff.findIndex(s => s.id === selectedStaffForModal.id);
+                   const prev = activeStaff[idx > 0 ? idx - 1 : activeStaff.length - 1];
+                   setSelectedStaffForModal(prev);
+                 }}><ChevronLeft size={16} /> ก่อนหน้า</button>
+                 <button className="btn btn-ghost btn-sm" onClick={() => {
+                   const idx = activeStaff.findIndex(s => s.id === selectedStaffForModal.id);
+                   const next = activeStaff[idx < activeStaff.length - 1 ? idx + 1 : 0];
+                   setSelectedStaffForModal(next);
+                 }}>ถัดไป <ChevronRight size={16} /></button>
+                 <button className="btn btn-ghost btn-icon" onClick={() => setSelectedStaffForModal(null)}><X size={20} /></button>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-md mb-md">
+              <div className="badge badge-neutral text-sm">ตำแหน่ง: {selectedStaffForModal.position}</div>
+              {selectedStaffForModal.level && selectedStaffForModal.level !== '-' && selectedStaffForModal.level !== selectedStaffForModal.position && (
+                <div className="badge badge-primary text-sm">{selectedStaffForModal.level}</div>
+              )}
+              {(() => {
+                const staffRoster = roster[selectedStaffForModal.id] || {};
+                let shiftHours = 0;
+                let manualOt = 0;
+                for (const d of Object.keys(staffRoster)) {
+                  const { shift, ot } = parseShift(staffRoster[d]);
+                  shiftHours += getShiftHours(shift, shiftTypesMap);
+                  manualOt += ot;
+                }
+                const targetHrs = Number(monthlySettings.roster_hours) || 0;
+                const finalOt = targetHrs > 0 ? Math.max(0, (shiftHours + manualOt) - targetHrs) : manualOt;
+                return (
+                  <>
+                    <div className="badge badge-success text-sm" style={{ marginLeft: 'auto' }}>รวม: {shiftHours + manualOt} ชม.</div>
+                    {finalOt > 0 && <div className="badge badge-danger text-sm">OT: +{finalOt} ชม.</div>}
+                  </>
+                );
+              })()}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px', marginBottom: 'var(--space-lg)' }}>
+              {['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสฯ', 'ศุกร์', 'เสาร์'].map((day, idx) => (
+                <div key={day} style={{ textAlign: 'center', fontSize: '0.8rem', fontWeight: 'bold', color: idx === 0 || idx === 6 ? 'var(--color-accent)' : 'var(--color-text-muted)', paddingBottom: '4px', borderBottom: '2px solid var(--border-color)' }}>{day}</div>
+              ))}
+              
+              {/* Empty days before 1st of month */}
+              {Array.from({ length: new Date(viewMonth.split('-')[0], viewMonth.split('-')[1] - 1, 1).getDay() }).map((_, i) => <div key={`empty-${i}`} />)}
+              
+              {/* Calendar Days */}
+              {days.map(d => {
+                 const cell = roster[selectedStaffForModal.id]?.[d];
+                 const { shift, ot } = parseShift(cell);
+                 const st = shiftTypesMap[shift];
+                 const isWknd = isWeekend(viewMonth, d);
+                 const hasViol = violations[selectedStaffForModal.id]?.has(d);
+                 
+                 return (
+                   <div key={d} style={{ 
+                     border: `1px solid ${hasViol ? 'var(--color-danger)' : 'var(--border-color)'}`, 
+                     borderRadius: '6px', 
+                     padding: '6px', 
+                     textAlign: 'center', 
+                     background: hasViol ? 'rgba(239, 68, 68, 0.05)' : (isWknd ? 'rgba(245, 158, 11, 0.05)' : 'white'), 
+                     minHeight: '75px', 
+                     display: 'flex', 
+                     flexDirection: 'column',
+                     boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                   }}>
+                     <div style={{ fontSize: '0.75rem', color: isWknd ? 'var(--color-accent)' : 'var(--color-text-muted)', marginBottom: '6px', fontWeight: 600 }}>{d}</div>
+                     {shift && shift !== '-' ? (
+                       <div className={`badge badge-${shift}`} style={{ ...(st?.hex ? { backgroundColor: `${st.hex}35`, color: '#1e293b', borderColor: `${st.hex}60` } : {}), margin: 'auto', width: '100%', display: 'flex', flexDirection: 'column', padding: '6px 2px', lineHeight: 1.2 }}>
+                         <span style={{ fontSize: '1.1rem', fontWeight: 800 }}>{shift}</span>
+                         {st && st.hours > 0 && <span style={{ fontSize: '0.6rem', opacity: 0.9, marginTop: '2px' }}>{st.start}-{st.end}</span>}
+                         {ot > 0 && <span style={{ fontSize: '0.6rem', background: 'rgba(255,255,255,0.2)', padding: '1px 4px', borderRadius: '4px', marginTop: '2px' }}>OT +{ot}</span>}
+                       </div>
+                     ) : (
+                       <div style={{ margin: 'auto', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>-</div>
+                     )}
+                   </div>
+                 )
+              })}
+            </div>
+            
+            <div className="flex gap-sm justify-end">
+               <button className="btn btn-secondary" onClick={() => setSelectedStaffForModal(null)}>ปิดหน้าต่าง</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <CustomDialog
         isOpen={dialog.isOpen}
