@@ -7,6 +7,7 @@ import {
   loadActiveMonth, saveActiveMonth,
 } from '../utils/storage';
 import MonthSelector from '../components/MonthSelector';
+import CustomDialog from '../components/CustomDialog';
 
 function generateId() {
   return 'L' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 4).toUpperCase();
@@ -18,8 +19,9 @@ export default function LeaveSchedulePage() {
   const [viewMonth, setViewMonthState] = useState(loadActiveMonth());
   // cellMap: { [staffId]: { [day]: shiftCode | '' } }
   const [cellMap, setCellMap] = useState({});
-  const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', danger: false, action: null });
+  const [showSuccess, setShowSuccess] = useState('');
   // Popup state
   const [popup, setPopup] = useState(null); // { staffId, day, x, y }
 
@@ -55,36 +57,9 @@ export default function LeaveSchedulePage() {
   const daysInMonth = useMemo(() => getDaysInMonth(viewMonth), [viewMonth]);
   const dayRange = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
-  // Convert cellMap back to flat schedule list and save
-  const handleSave = () => {
-    const schedules = [];
-    for (const [staffId, days] of Object.entries(cellMap)) {
-      // Group consecutive days with same shiftCode into ranges
-      const dayNums = Object.keys(days).map(Number).sort((a, b) => a - b);
-      let i = 0;
-      while (i < dayNums.length) {
-        const code = days[dayNums[i]];
-        if (!code) { i++; continue; }
-        let j = i;
-        while (
-          j + 1 < dayNums.length &&
-          dayNums[j + 1] === dayNums[j] + 1 &&
-          days[dayNums[j + 1]] === code
-        ) j++;
-        schedules.push({
-          id: generateId(),
-          staffId,
-          shiftCode: code,
-          startDay: dayNums[i],
-          endDay: dayNums[j],
-          note: '',
-        });
-        i = j + 1;
-      }
-    }
-    saveLeaveSchedules(viewMonth, schedules);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+  const showToast = (msg) => {
+    setShowSuccess(msg);
+    setTimeout(() => setShowSuccess(''), 3000);
   };
 
   const handleCellClick = (e, staffId, day) => {
@@ -163,8 +138,7 @@ export default function LeaveSchedulePage() {
       
       return nextMap;
     });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+    showToast('อัปเดตข้อมูลเรียบร้อยแล้ว');
     setPopup(null);
   };
 
@@ -182,12 +156,17 @@ export default function LeaveSchedulePage() {
   }, [cellMap]);
 
   const handleClearAll = () => {
-    if (window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการ "ล้างข้อมูลทั้งหมด" ในเดือนนี้?\n(การกระทำนี้ไม่สามารถย้อนกลับได้)`)) {
-      saveLeaveSchedules(viewMonth, []);
-      setCellMap({});
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: 'ยืนยันการล้างข้อมูล',
+      message: 'คุณแน่ใจหรือไม่ว่าต้องการ "ล้างข้อมูลทั้งหมด" ในเดือนนี้?\n(การกระทำนี้ไม่สามารถย้อนกลับได้)',
+      danger: true,
+      action: () => {
+        saveLeaveSchedules(viewMonth, []);
+        setCellMap({});
+        showToast('ล้างข้อมูลเดือนนี้ทั้งหมดเรียบร้อยแล้ว');
+      }
+    });
   };
 
   if (loading) return <div className="page-container"><div className="card" style={{padding:'40px',textAlign:'center'}}>กำลังโหลดข้อมูล...</div></div>;
@@ -204,10 +183,6 @@ export default function LeaveSchedulePage() {
           <button className="btn btn-ghost" onClick={handleClearAll} style={{ color: 'var(--color-danger)', padding: '0 8px' }} title="ล้างข้อมูลเดือนนี้ทั้งหมด">
             <Trash2 size={16} /> <span className="hide-mobile">ล้างข้อมูล</span>
           </button>
-          <button className="btn btn-primary" onClick={handleSave}>
-            {saved ? <CheckCircle size={16} /> : <Save size={16} />}
-            {saved ? 'บันทึกแล้ว!' : 'บันทึก'}
-          </button>
         </div>
       </div>
 
@@ -220,7 +195,7 @@ export default function LeaveSchedulePage() {
       }}>
         <Info size={18} style={{ color: 'var(--color-primary)', marginTop: 2, flexShrink: 0 }} />
         <div style={{ fontSize: '0.85rem', lineHeight: 1.6 }}>
-          <strong>วิธีใช้:</strong> คลิกที่ช่องวันที่ของพนักงานเพื่อเลือกเวร/ประเภทลา คลิกอีกครั้งเพื่อเปลี่ยน หรือเลือก "ล้าง" เพื่อยกเลิก — กด <strong>บันทึก</strong> ก่อน Generate ตารางเวร
+          <strong>วิธีใช้:</strong> คลิกที่ช่องวันที่ของพนักงานเพื่อเลือกเวร/ประเภทลา คลิกอีกครั้งเพื่อเปลี่ยน หรือเลือก "ล้าง" เพื่อยกเลิก — <strong>ข้อมูลจะถูกบันทึกอัตโนมัติ</strong>
           {totalLeaveDays > 0 && <span style={{ marginLeft: 8, color: 'var(--color-accent)', fontWeight: 700 }}>
             ✅ {totalLeaveDays} วันที่กำหนดไว้แล้ว
           </span>}
@@ -579,6 +554,31 @@ export default function LeaveSchedulePage() {
           </div>
         </>
       )}
+      {/* Success Toast */}
+      {showSuccess && (
+        <div className="animate-slide-up" style={{
+          position: 'fixed', bottom: 32, right: 32, zIndex: 9999,
+          background: 'var(--color-bg-card)', border: '1px solid var(--color-success)',
+          boxShadow: 'var(--shadow-lg)', padding: '14px 24px', borderRadius: 12,
+          display: 'flex', alignItems: 'center', gap: 12
+        }}>
+          <CheckCircle size={24} style={{ color: 'var(--color-success)' }} />
+          <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{showSuccess}</span>
+        </div>
+      )}
+
+      <CustomDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        type="CONFIRM"
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        danger={confirmDialog.danger}
+        onConfirm={() => {
+          if (confirmDialog.action) confirmDialog.action();
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        }}
+      />
     </div>
   );
 }

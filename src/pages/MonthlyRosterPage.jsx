@@ -26,6 +26,7 @@ export default function MonthlyRosterPage() {
   const [monthlySettings, setMonthlySettings] = useState({});
   const [dialog, setDialog] = useState({ isOpen: false, type: 'CONFIRM', title: '', message: '', onConfirm: null, danger: false });
   const [selectedStaffForModal, setSelectedStaffForModal] = useState(null);
+  const [showSuccess, setShowSuccess] = useState('');
 
   const closeDialog = () => setDialog(prev => ({ ...prev, isOpen: false }));
 
@@ -120,6 +121,11 @@ export default function MonthlyRosterPage() {
     return counts;
   }, [roster, activeStaff, shiftTypesMap, days]);
 
+  const showToast = (msg) => {
+    setShowSuccess(msg);
+    setTimeout(() => setShowSuccess(''), 3000);
+  };
+
   const handleShiftChange = (staffId, day, { shift, ot, otType = '' }) => {
     setRoster(prev => {
       const staffRoster = prev[staffId] || {};
@@ -128,16 +134,15 @@ export default function MonthlyRosterPage() {
         ...prev,
         [staffId]: { ...staffRoster, [day]: val }
       };
-      saveMonthlyRoster(nextRoster, viewMonth);
+      // Removed auto-save here because user prefers manual save for the roster grid
       return nextRoster;
     });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
   };
 
   const handleSave = () => {
     saveMonthlyRoster(roster, viewMonth);
     setSaved(true);
+    showToast('บันทึกตารางเวรเรียบร้อยแล้ว');
     setTimeout(() => setSaved(false), 3000);
   };
 
@@ -152,6 +157,7 @@ export default function MonthlyRosterPage() {
       onConfirm: () => {
         setRoster({});
         saveMonthlyRoster({}, viewMonth);
+        showToast('ล้างตารางเวรเรียบร้อยแล้ว');
         closeDialog();
       }
     });
@@ -488,6 +494,19 @@ export default function MonthlyRosterPage() {
         danger={dialog.danger}
         confirmText={dialog.confirmText}
       />
+
+      {/* Success Toast */}
+      {showSuccess && (
+        <div className="animate-slide-up" style={{
+          position: 'fixed', bottom: 32, right: 32, zIndex: 9999,
+          background: 'var(--color-bg-card)', border: '1px solid var(--color-success)',
+          boxShadow: 'var(--shadow-lg)', padding: '14px 24px', borderRadius: 12,
+          display: 'flex', alignItems: 'center', gap: 12
+        }}>
+          <CheckCircle size={24} style={{ color: 'var(--color-success)' }} />
+          <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{showSuccess}</span>
+        </div>
+      )}
     </div>
   );
 }

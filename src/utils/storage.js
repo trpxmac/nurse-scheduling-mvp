@@ -41,6 +41,8 @@ export const DEFAULT_CONFIG = {
   required_N12_coverage: 3,
   incompatible_levels: [],
   required_level_every_shift: '',
+  shift_fairness_mode: 'balanced', // 'balanced' | 'maximize'
+  max_night_shifts_per_month: 0,  // 0 = no limit
 };
 
 export const DEFAULT_SHIFT_TYPES = [

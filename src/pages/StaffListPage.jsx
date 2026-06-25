@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Users, Plus, Save, CheckCircle, Trash2, Search, UserPlus, X } from 'lucide-react';
 import { loadStaffList, saveStaffList, generateStaffId, loadShiftTypes } from '../utils/storage';
 import Modal from '../components/Modal';
+import CustomDialog from '../components/CustomDialog';
 
 const POSITIONS = ['HOD', 'RN4', 'RN3', 'RN2', 'RN1', 'PN', 'PA', 'NA'];
 const LEVELS = ['HOD', 'RN4', 'RN3', 'RN2', 'RN1'];
@@ -21,8 +22,9 @@ export default function StaffListPage() {
   const [staffList, setStaffList] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editIndex, setEditIndex] = useState(-1);
-  const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', danger: false, action: null });
+  const [showSuccess, setShowSuccess] = useState('');
   const [search, setSearch] = useState('');
   const [filterPos, setFilterPos] = useState('');
   const [shiftTypes, setShiftTypes] = useState([]);
@@ -47,12 +49,6 @@ export default function StaffListPage() {
   }, []);
 
   if (loading) return <div className="page-container"><div className="card" style={{padding:'40px',textAlign:'center'}}>กำลังโหลดข้อมูล...</div></div>;
-
-  const handleSave = () => {
-    saveStaffList(staffList);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
-  };
 
   const openAddModal = () => {
     setForm({
@@ -115,22 +111,46 @@ export default function StaffListPage() {
 
   const handleSubmitForm = () => {
     if (!form.firstName || !form.lastName) return;
-    let newList;
-    if (editIndex >= 0) {
-      newList = [...staffList];
-      newList[editIndex] = { ...form };
-    } else {
-      newList = [...staffList, { ...form }];
-    }
-    setStaffList(newList);
-    saveStaffList(newList);
-    setShowModal(false);
+    
+    setConfirmDialog({
+      isOpen: true,
+      title: editIndex >= 0 ? 'ยืนยันการแก้ไขข้อมูล' : 'ยืนยันการเพิ่มข้อมูล',
+      message: editIndex >= 0 ? 'คุณต้องการบันทึกการแก้ไขข้อมูลบุคลากรนี้ใช่หรือไม่?' : 'คุณต้องการเพิ่มบุคลากรใหม่ใช่หรือไม่?',
+      danger: false,
+      action: () => {
+        let newList;
+        if (editIndex >= 0) {
+          newList = [...staffList];
+          newList[editIndex] = { ...form };
+        } else {
+          newList = [...staffList, { ...form }];
+        }
+        setStaffList(newList);
+        saveStaffList(newList);
+        setShowModal(false);
+        showToast('บันทึกข้อมูลบุคลากรเรียบร้อยแล้ว');
+      }
+    });
+  };
+
+  const showToast = (msg) => {
+    setShowSuccess(msg);
+    setTimeout(() => setShowSuccess(''), 3000);
   };
 
   const handleDelete = (index) => {
-    const updated = staffList.filter((_, i) => i !== index);
-    setStaffList(updated);
-    saveStaffList(updated);
+    setConfirmDialog({
+      isOpen: true,
+      title: 'ยืนยันการลบข้อมูล',
+      message: 'คุณต้องการลบข้อมูลบุคลากรนี้ใช่หรือไม่?\n(หากลบแล้วจะไม่สามารถกู้คืนได้)',
+      danger: true,
+      action: () => {
+        const updated = staffList.filter((_, i) => i !== index);
+        setStaffList(updated);
+        saveStaffList(updated);
+        showToast('ลบข้อมูลบุคลากรเรียบร้อยแล้ว');
+      }
+    });
   };
 
   const handleToggleActive = (index) => {
@@ -138,6 +158,7 @@ export default function StaffListPage() {
     updated[index] = { ...updated[index], active: !updated[index].active };
     setStaffList(updated);
     saveStaffList(updated);
+    showToast('อัปเดตสถานะเรียบร้อยแล้ว');
   };
 
   // Filtered list
@@ -163,10 +184,6 @@ export default function StaffListPage() {
         <div className="page-header-actions">
           <button className="btn btn-ghost" onClick={openAddModal}>
             <UserPlus size={16} /> เพิ่มบุคลากร
-          </button>
-          <button className="btn btn-primary" onClick={handleSave}>
-            {saved ? <CheckCircle size={16} /> : <Save size={16} />}
-            {saved ? 'บันทึกแล้ว!' : 'บันทึก'}
           </button>
         </div>
       </div>
@@ -542,6 +559,32 @@ export default function StaffListPage() {
           </div>
         </div>
       </Modal>
+
+      <CustomDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        type="CONFIRM"
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        danger={confirmDialog.danger}
+        onConfirm={() => {
+          if (confirmDialog.action) confirmDialog.action();
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        }}
+      />
+
+      {/* Success Toast */}
+      {showSuccess && (
+        <div className="animate-slide-up" style={{
+          position: 'fixed', bottom: 32, right: 32, zIndex: 9999,
+          background: 'var(--color-bg-card)', border: '1px solid var(--color-success)',
+          boxShadow: 'var(--shadow-lg)', padding: '14px 24px', borderRadius: 12,
+          display: 'flex', alignItems: 'center', gap: 12
+        }}>
+          <CheckCircle size={24} style={{ color: 'var(--color-success)' }} />
+          <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{showSuccess}</span>
+        </div>
+      )}
     </div>
   );
 }

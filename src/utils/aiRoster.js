@@ -10,6 +10,19 @@ export function isSenior(staff) {
   return ['HOD', 'RN2', 'RN3', 'RN4', 'RN5'].includes(lvl);
 }
 
+// Count night shifts already assigned to a staff member
+function calcNightShiftCount(staffRoster, shiftTypesMap) {
+  let count = 0;
+  for (const day of Object.keys(staffRoster)) {
+    const code = staffRoster[day];
+    if (code && code !== '-' && code.toLowerCase() !== 'x') {
+      const st = shiftTypesMap[code];
+      if (st && st.category === 'NIGHT') count++;
+    }
+  }
+  return count;
+}
+
 export function meetsRequiredLevel(staff, reqLevel) {
   if (!reqLevel) return true;
   const LEVEL_RANK = {
@@ -93,21 +106,24 @@ export function checkFeasibility(staffList, shiftTypes, config, lockedSlots = {}
     });
   }
 
-  // 4. Calculate hours feasibility
-  const targetWorkHours = Number(config.roster_hours) || 160;
-  const maxPossibleHours = maxWorkDaysPerStaff * avgShiftHours;
+  // 4. Calculate hours feasibility (only if roster_hours is set)
+  const targetWorkHours = Number(config.roster_hours) || 0;
+  if (targetWorkHours > 0) {
+    const maxPossibleHours = maxWorkDaysPerStaff * avgShiftHours;
 
-  if (targetWorkHours > maxPossibleHours) {
-    const requiredWorkDays = Math.ceil(targetWorkHours / avgShiftHours);
-    warnings.push({
-      type: 'hours',
-      message: `เป้าหมายชั่วโมงเวร ${targetWorkHours} ชม. อาจทำไม่ได้จริงตามกฎ`,
-      details: `เป้า ${targetWorkHours} ชม. ต้องทำประมาณ ${requiredWorkDays} เวร แต่กฎ "ทำงานสูงสุด ${maxConsecutive} วันติด" ยอมให้ทำได้สูงสุดแค่ ~${Math.floor(maxPossibleHours)} ชม. ต่อคน`
-    });
+    if (targetWorkHours > maxPossibleHours) {
+      const requiredWorkDays = Math.ceil(targetWorkHours / avgShiftHours);
+      warnings.push({
+        type: 'hours',
+        message: `เป้าหมายชั่วโมงเวร ${targetWorkHours} ชม. อาจทำไม่ได้จริงตามกฎ`,
+        details: `เป้า ${targetWorkHours} ชม. ต้องทำประมาณ ${requiredWorkDays} เวร แต่กฎ "ทำงานสูงสุด ${maxConsecutive} วันติด" ยอมให้ทำได้สูงสุดแค่ ~${Math.floor(maxPossibleHours)} ชม. ต่อคน`
+      });
+    }
   }
 
   return warnings;
 }
+
 
 /**
  * Generate AI roster for all active staff
@@ -139,14 +155,15 @@ export function generateAIRoster(staffList, shiftTypes, config, lockedSlots = {}
 
   if (workShifts.length === 0) workShifts = activeShifts.filter(s => s.hours > 0);
 
-  // Sort workShifts by hours descending, then by coverage requirement descending.
-  // This ensures that the staff with the lowest current hours are evaluated for 12-hour shifts FIRST,
-  // allowing them to catch up. Otherwise, they get assigned 8-hour shifts first and stay permanently behind.
+  // Sort workShifts by COVERAGE RATIO PRIORITY, not hours.
+  // We want the shifts that are most "behind" relative to their requirement to be filled first.
+  // On the first iteration, all shifts start at 0, so we sort by required coverage DESC,
+  // then hours DESC as a tiebreaker. The real ratio-based sort happens per-day in Phase 1.
   workShifts.sort((a, b) => {
-    if (b.hours !== a.hours) return b.hours - a.hours;
     const reqA = config[`required_${a.code}_coverage`] || 0;
     const reqB = config[`required_${b.code}_coverage`] || 0;
-    return reqB - reqA;
+    if (reqB !== reqA) return reqB - reqA;
+    return b.hours - a.hours;
   });
 
   // Initialize roster and pre-fill with locked leave days
@@ -195,6 +212,9 @@ export function generateAIRoster(staffList, shiftTypes, config, lockedSlots = {}
   }
   */
 
+  // Extract night shift limit from config
+  const maxNightShiftsPerMonth = Number(config.max_night_shifts_per_month) || 0;
+
   // For each day, assign shifts to meet coverage
   for (let day = 1; day <= daysInMonth; day++) {
     // Only include staff that don't have a locked slot for this day
@@ -208,36 +228,76 @@ export function generateAIRoster(staffList, shiftTypes, config, lockedSlots = {}
       dayCoverage[s.code] = 0;
     }
 
-    // Phase 1: Fill coverage requirements
-    for (const shift of workShifts) {
+    // Phase 1: Fill coverage requirements using RATIO-BASED priority
+    // Sort shifts by how far they are from meeting their requirement (most behind first)
+    const phase1Shifts = [...workShifts].sort((a, b) => {
+      const reqA = config[`required_${a.code}_coverage`] || 0;
+      const reqB = config[`required_${b.code}_coverage`] || 0;
+      if (reqA === 0 && reqB === 0) return b.hours - a.hours;
+      if (reqA === 0) return 1;
+      if (reqB === 0) return -1;
+      // Sort by shortage ratio: (required - current) / required
+      const ratioA = reqA > 0 ? (reqA - (dayCoverage[a.code] || 0)) / reqA : 0;
+      const ratioB = reqB > 0 ? (reqB - (dayCoverage[b.code] || 0)) / reqB : 0;
+      if (Math.abs(ratioB - ratioA) > 0.01) return ratioB - ratioA;
+      return b.hours - a.hours;
+    });
+
+    for (const shift of phase1Shifts) {
       const shiftCode = shift.code;
       const required = config[`required_${shiftCode}_coverage`] || 0;
       if (required === 0) continue;
 
-      for (let i = 0; i < required && staffPool.length > 0; i++) {
+      while ((dayCoverage[shiftCode] || 0) < required && staffPool.length > 0) {
         const assignedStaffThisShift = activeStaff.filter(s => dayAssignments[s.id] === shiftCode);
-        const staffIdx = findBestStaff(staffPool, roster, shiftCode, day, shiftTypesMap, config, daysInMonth, assignedStaffThisShift);
+        const staffIdx = findBestStaff(staffPool, roster, shiftCode, day, shiftTypesMap, config, daysInMonth, assignedStaffThisShift, maxNightShiftsPerMonth);
         if (staffIdx >= 0) {
           const staff = staffPool[staffIdx];
           roster[staff.id][day] = shiftCode;
           dayAssignments[staff.id] = shiftCode;
           dayCoverage[shiftCode] = (dayCoverage[shiftCode] || 0) + 1;
           staffPool.splice(staffIdx, 1);
+        } else {
+          break; // No valid staff for this shift, move on
+        }
+      }
+    }
+
+    // === Phase 1.5: Coverage Backfill ===
+    // If any shift still hasn't met coverage, try harder by pulling from
+    // remaining staff who haven't been assigned yet, relaxing some preferences
+    for (const shift of phase1Shifts) {
+      const shiftCode = shift.code;
+      const required = config[`required_${shiftCode}_coverage`] || 0;
+      if (required === 0 || (dayCoverage[shiftCode] || 0) >= required) continue;
+
+      // Try staff that haven't been assigned today (from staffPool that remains)
+      while ((dayCoverage[shiftCode] || 0) < required && staffPool.length > 0) {
+        const assignedStaffThisShift = activeStaff.filter(s => dayAssignments[s.id] === shiftCode);
+        const staffIdx = findBestStaff(staffPool, roster, shiftCode, day, shiftTypesMap, config, daysInMonth, assignedStaffThisShift, maxNightShiftsPerMonth, true /* backfill mode */);
+        if (staffIdx >= 0) {
+          const staff = staffPool[staffIdx];
+          roster[staff.id][day] = shiftCode;
+          dayAssignments[staff.id] = shiftCode;
+          dayCoverage[shiftCode] = (dayCoverage[shiftCode] || 0) + 1;
+          staffPool.splice(staffIdx, 1);
+        } else {
+          break;
         }
       }
     }
 
     // Phase 2: Assign remaining staff (some work, some OFF)
-    // IMPORTANT: Phase 1 already assigns ~11 staff per day for coverage.
-    // Phase 2 should ONLY add extra shifts for staff who are significantly behind.
-    // Being too aggressive here causes consecutive-workday violations → fewer staff
-    // available for Phase 1 on future days → coverage shortages.
+    // IMPORTANT: Phase 1+1.5 already assigns minimum coverage staff.
+    // Phase 2 adds extra shifts for staff who need more hours to reach target,
+    // or if Maximize mode is on, fills as many shifts as possible.
     staffPool.sort((a, b) => {
       return calcCurrentHours(roster[a.id], shiftTypesMap) - calcCurrentHours(roster[b.id], shiftTypesMap);
     });
 
-    const targetWorkHours = Number(config.roster_hours) || 160;
+    const targetWorkHours = Number(config.roster_hours) || 0; // 0 = not set
     const remainingDays = daysInMonth - day + 1;
+    const isMaximizeMode = config.shift_fairness_mode === 'maximize';
 
     // Calculate average hours across all staff for comparison
     let totalHoursAll = 0;
@@ -252,18 +312,19 @@ export function generateAIRoster(staffList, shiftTypes, config, lockedSlots = {}
       : 12;
     if (avgShiftHours === 0) avgShiftHours = 12;
 
-    // Dynamic Extra Assignment Limit
-    // Calculate how many shifts we need per day ON AVERAGE to reach targetWorkHours
-    const totalRemainingHours = Math.max(0, (targetWorkHours * activeStaff.length) - totalHoursAll);
-    const shiftsNeededPerDay = remainingDays > 0 ? (totalRemainingHours / avgShiftHours) / remainingDays : 0;
-    const minStaffPerDay = workShifts.reduce((acc, s) => acc + (Number(config[`required_${s.code}_coverage`]) || 0), 0);
-    
-    let maxExtraPerDay = 2; // Default conservative limit
-    if (shiftsNeededPerDay > minStaffPerDay) {
-      // We need more shifts than Phase 1 assigns, so increase the extra allowance
+    let maxExtraPerDay;
+    if (isMaximizeMode) {
+      // Maximize: assign shifts to as many staff as possible without violating rules
+      maxExtraPerDay = staffPool.length; // No artificial limit — fill everyone who can work
+    } else if (targetWorkHours > 0) {
+      // Balanced: dynamically calculate how many extra shifts are needed
+      const totalRemainingHours = Math.max(0, (targetWorkHours * activeStaff.length) - totalHoursAll);
+      const shiftsNeededPerDay = remainingDays > 0 ? (totalRemainingHours / avgShiftHours) / remainingDays : 0;
+      const minStaffPerDay = workShifts.reduce((acc, s) => acc + (Number(config[`required_${s.code}_coverage`]) || 0), 0);
       maxExtraPerDay = Math.max(2, Math.ceil(shiftsNeededPerDay - minStaffPerDay + 1));
-      // Cap at 60% of staff to avoid blowing through all staff and causing consecutive-workday shortages tomorrow
       maxExtraPerDay = Math.min(maxExtraPerDay, Math.floor(activeStaff.length * 0.6));
+    } else {
+      maxExtraPerDay = 2; // Default conservative limit when no target is set
     }
 
     let extraAssigned = 0;
@@ -271,20 +332,32 @@ export function generateAIRoster(staffList, shiftTypes, config, lockedSlots = {}
     for (const staff of staffPool) {
       const currentHours = calcCurrentHours(roster[staff.id], shiftTypesMap);
 
-      // Already at or above target — rest
-      if (currentHours >= targetWorkHours) {
-        roster[staff.id][day] = '-';
-        continue;
-      }
+      if (!isMaximizeMode && targetWorkHours > 0) {
+        // Balanced mode: rest if already at or above target
+        if (currentHours >= targetWorkHours) {
+          roster[staff.id][day] = '-';
+          continue;
+        }
 
-      // Only assign extra shifts if staff needs at least ~half a shift to reach target
-      const hoursNeeded = targetWorkHours - currentHours;
-      const shouldWork = hoursNeeded >= (avgShiftHours * 0.4) && extraAssigned < maxExtraPerDay;
-
-      if (!shouldWork) {
-        roster[staff.id][day] = '-';
-        continue;
+        // Only assign extra shifts if staff needs at least ~half a shift to reach target
+        const hoursNeeded = targetWorkHours - currentHours;
+        const shouldWork = hoursNeeded >= (avgShiftHours * 0.4) && extraAssigned < maxExtraPerDay;
+        if (!shouldWork) {
+          roster[staff.id][day] = '-';
+          continue;
+        }
+      } else if (!isMaximizeMode) {
+        // No target set, conservative: only assign if significantly behind average
+        if (currentHours >= avgHoursAll && extraAssigned >= maxExtraPerDay) {
+          roster[staff.id][day] = '-';
+          continue;
+        }
+        if (extraAssigned >= maxExtraPerDay) {
+          roster[staff.id][day] = '-';
+          continue;
+        }
       }
+      // Maximize mode: try to assign to everyone
 
       // Find a suitable shift — prefer shifts with lowest coverage ratio
       const availableShifts = workShifts.filter(s => s.code !== '-' && Number(config[`required_${s.code}_coverage`]) > 0);
@@ -308,7 +381,7 @@ export function generateAIRoster(staffList, shiftTypes, config, lockedSlots = {}
             dayAssignments[staff.id] = chosen.code;
             dayCoverage[chosen.code] = (dayCoverage[chosen.code] || 0) + 1;
             assigned = true;
-            extraAssigned++;
+            if (!isMaximizeMode) extraAssigned++;
             break;
           }
         }
@@ -324,33 +397,65 @@ export function generateAIRoster(staffList, shiftTypes, config, lockedSlots = {}
 
 
 
-  // Calculate score (returns { total, legal, safety, quality, breakdown })
+  // Calculate score
   const scoreResult = calculateAIScore(roster, activeStaff, shiftTypesMap, config, daysInMonth, workShifts);
   const summary = generateSummary(roster, activeStaff, shiftTypesMap, config, daysInMonth, workShifts);
+
+  // Attach per-shift coverage stats to summary
+  const coverageStats = {};
+  for (const shift of workShifts) {
+    const req = config[`required_${shift.code}_coverage`] || 0;
+    if (req === 0) continue;
+    let metDays = 0;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const actual = activeStaff.filter(s => roster[s.id]?.[d] === shift.code).length;
+      if (actual >= req) metDays++;
+    }
+    coverageStats[shift.code] = { required: req, metDays, totalDays: daysInMonth, rate: Math.round((metDays / daysInMonth) * 100) };
+  }
+  summary.coverageStats = coverageStats;
+  
+  // Calculate night shift fairness
+  const nightCounts = activeStaff.map(s => ({
+    id: s.id,
+    name: `${s.firstName} ${s.lastName}`,
+    nights: calcNightShiftCount(roster[s.id] || {}, shiftTypesMap)
+  }));
+  const avgNights = nightCounts.reduce((a, b) => a + b.nights, 0) / (nightCounts.length || 1);
+  const nightStdDev = Math.sqrt(nightCounts.reduce((s, b) => s + Math.pow(b.nights - avgNights, 2), 0) / (nightCounts.length || 1));
+  summary.nightFairness = { avgNights: Math.round(avgNights * 10) / 10, stdDev: Math.round(nightStdDev * 10) / 10, distribution: nightCounts };
 
   return { roster, score: scoreResult.total, scoreBreakdown: scoreResult, summary };
 }
 
 /**
  * Find the best staff member for a given shift on a day
+ * @param {boolean} backfillMode - When true, relax some quality preferences to ensure coverage
  */
-function findBestStaff(pool, roster, shiftCode, day, shiftTypesMap, config, daysInMonth, assignedStaffThisShift = []) {
+function findBestStaff(pool, roster, shiftCode, day, shiftTypesMap, config, daysInMonth, assignedStaffThisShift = [], maxNightShiftsPerMonth = 0, backfillMode = false) {
   let bestIdx = -1;
   let bestScore = -Infinity;
   const hasSenior = assignedStaffThisShift.some(isSenior);
   const reqLevel = config.required_level_every_shift;
   const hasRequiredLevel = reqLevel ? assignedStaffThisShift.some(s => meetsRequiredLevel(s, reqLevel)) : true;
 
-  // Calculate average hours across ALL staff for catch-up bonus
+  // Is this shift a night shift?
+  const targetShiftType = shiftTypesMap[shiftCode];
+  const isNightShift = targetShiftType && targetShiftType.category === 'NIGHT';
+
+  // Average nights across all staff (for fairness)
   const allStaffIds = Object.keys(roster);
   const allHours = allStaffIds.map(id => calcCurrentHours(roster[id], shiftTypesMap));
   const avgHours = allHours.length > 0 ? allHours.reduce((a, b) => a + b, 0) / allHours.length : 0;
+
+  // Night shift average for fairness
+  const allNights = allStaffIds.map(id => calcNightShiftCount(roster[id], shiftTypesMap));
+  const avgNights = allNights.length > 0 ? allNights.reduce((a, b) => a + b, 0) / allNights.length : 0;
 
   for (let i = 0; i < pool.length; i++) {
     const staff = pool[i];
 
     // Check if assignment is valid
-    // Pass the required level down to check validation constraints if necessary
     if (!isAssignmentValid(roster, staff, day, shiftCode, shiftTypesMap, config, assignedStaffThisShift)) {
       continue;
     }
@@ -360,10 +465,27 @@ function findBestStaff(pool, roster, shiftCode, day, shiftTypesMap, config, days
     let score = 10000 - (currentHours * 10);
 
     // Catch-up bonus: strongly boost staff who are significantly behind the average
-    // This ensures staff limited in shift types (e.g. can't do nights) still get enough shifts
     const deficit = avgHours - currentHours;
     if (deficit > 0) {
       score += deficit * 50;
+    }
+
+    // Night Shift Fairness: prefer staff with fewer nights when assigning night shifts
+    if (isNightShift) {
+      const staffNights = calcNightShiftCount(roster[staff.id], shiftTypesMap);
+      // Strongly prefer staff with fewer nights than average
+      const nightDeficit = avgNights - staffNights;
+      if (nightDeficit > 0) score += nightDeficit * 800;
+      else score += nightDeficit * 400; // Penalize staff who already have too many nights
+
+      // Hard limit: if max_night_shifts_per_month is set and staff exceeded it, skip
+      if (maxNightShiftsPerMonth > 0 && staffNights >= maxNightShiftsPerMonth) {
+        continue;
+      }
+    } else {
+      // For day shifts: prefer staff who already have more nights (to balance overall)
+      const staffNights = calcNightShiftCount(roster[staff.id], shiftTypesMap);
+      if (staffNights > avgNights) score += (staffNights - avgNights) * 200;
     }
 
     // Boost score if staff has had several consecutive days off
@@ -376,7 +498,6 @@ function findBestStaff(pool, roster, shiftCode, day, shiftTypesMap, config, days
         break;
       }
     }
-    // Boost heavily for 2+ days off, but mildly for 1 day off
     score += consecutiveOff * 2500;
 
     // Boost if shift has a min limit and staff hasn't reached it
@@ -392,9 +513,10 @@ function findBestStaff(pool, roster, shiftCode, day, shiftTypesMap, config, days
     }
 
     // Penalize if the staff already has this specific shift (diversify shift types)
-    // Cap at 3000 so staff limited to few shift types don't get permanently blocked
+    // In backfill mode, reduce penalty to allow coverage to be met
     const currentShiftCount = Object.values(roster[staff.id]).filter(v => v === shiftCode).length;
-    score -= Math.min(currentShiftCount * 500, 3000);
+    const diversifyPenalty = backfillMode ? Math.min(currentShiftCount * 200, 1000) : Math.min(currentShiftCount * 500, 3000);
+    score -= diversifyPenalty;
 
     // Rule: Prioritize required level if the shift doesn't have one yet
     if (reqLevel && !hasRequiredLevel && meetsRequiredLevel(staff, reqLevel)) {

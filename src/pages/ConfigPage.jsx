@@ -1,11 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Settings, Save, RotateCcw, CheckCircle, Clock, Users, Moon, UserX, Plus, Trash2 } from 'lucide-react';
 import { loadConfig, saveConfig, DEFAULT_CONFIG, getMonthName, loadActiveDepartment, saveActiveDepartment, loadDepartments, saveDepartments, loadMonthlySettings, saveMonthlySettings, loadStaffList } from '../utils/storage';
+import CustomDialog from '../components/CustomDialog';
 
 export default function ConfigPage() {
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   const [monthlyConfig, setMonthlyConfig] = useState({ roster_hours: '', holiday_hours: '' });
   const [saved, setSaved] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', danger: false, action: null });
+  const [showSuccess, setShowSuccess] = useState('');
+  const timerRef = useRef(null);
   const [level1, setLevel1] = useState('RN1');
   const [level2, setLevel2] = useState('RN1');
 
@@ -34,39 +38,30 @@ export default function ConfigPage() {
 
   if (loading) return <div className="page-container"><div className="card" style={{padding:'40px',textAlign:'center'}}>กำลังโหลดข้อมูล...</div></div>;
 
+  const showToast = (msg) => {
+    setShowSuccess(msg);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setShowSuccess(''), 3000);
+  };
+
   const handleChange = (field, value) => {
     setConfig(prev => {
       const next = { ...prev, [field]: value };
-      saveConfig(next);
+      // Removed auto-save here to prevent accidental configuration changes
       return next;
     });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    
+    // Auto-update monthly settings state when month changes, but don't save yet
     if (field === 'month') {
       loadMonthlySettings(value).then(setMonthlyConfig);
-    }
-    if (field === 'unit_name') {
-      const activeDept = loadActiveDepartment();
-      if (activeDept && activeDept.name !== value) {
-        const updatedDept = { ...activeDept, name: value || 'Unnamed Unit' };
-        saveActiveDepartment(updatedDept);
-        loadDepartments().then(depts => {
-          const updatedDepts = depts.map(d => d.id === updatedDept.id ? updatedDept : d);
-          saveDepartments(updatedDepts);
-          window.dispatchEvent(new Event('nss_department_updated'));
-        });
-      }
     }
   };
 
   const handleMonthlyChange = (field, value) => {
     setMonthlyConfig(prev => {
       const next = { ...prev, [field]: value };
-      saveMonthlySettings(config.month, next);
       return next;
     });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
   };
 
   const handleNumberChange = (field, value) => {
@@ -78,8 +73,9 @@ export default function ConfigPage() {
     saveConfig(config);
     saveMonthlySettings(config.month, monthlyConfig);
     
+    // Handle Unit Name update across the system
     const activeDept = loadActiveDepartment();
-    if (activeDept.name !== config.unit_name) {
+    if (activeDept && activeDept.name !== config.unit_name) {
       const updatedDept = { ...activeDept, name: config.unit_name || 'Unnamed Unit' };
       saveActiveDepartment(updatedDept);
       loadDepartments().then(depts => {
@@ -90,12 +86,22 @@ export default function ConfigPage() {
     }
 
     setSaved(true);
+    showToast('บันทึกการตั้งค่าเรียบร้อยแล้ว');
     setTimeout(() => setSaved(false), 3000);
   };
 
   const handleReset = () => {
-    setConfig(DEFAULT_CONFIG);
-    saveConfig(DEFAULT_CONFIG);
+    setConfirmDialog({
+      isOpen: true,
+      title: 'ยืนยันการรีเซ็ตข้อมูล',
+      message: 'คุณต้องการรีเซ็ตการตั้งค่าทั้งหมดให้กลับเป็นค่าเริ่มต้นหรือไม่?\n(ข้อมูลการตั้งค่าเก่าจะหายทั้งหมด)',
+      danger: true,
+      action: () => {
+        setConfig(DEFAULT_CONFIG);
+        saveConfig(DEFAULT_CONFIG);
+        showToast('รีเซ็ตการตั้งค่าเรียบร้อยแล้ว');
+      }
+    });
   };
 
   const handleAddIncompatible = () => {
@@ -106,6 +112,7 @@ export default function ConfigPage() {
       const newConfig = { ...config, incompatible_levels: [...current, pair] };
       setConfig(newConfig);
       saveConfig(newConfig);
+      showToast('เพิ่มกฎการจับคู่เรียบร้อยแล้ว');
     }
   };
 
@@ -114,6 +121,7 @@ export default function ConfigPage() {
     const newConfig = { ...config, incompatible_levels: current.filter(p => p !== pairToRemove) };
     setConfig(newConfig);
     saveConfig(newConfig);
+    showToast('ลบกฎการจับคู่เรียบร้อยแล้ว');
   };
 
   const mode = config.shift_mode;
@@ -363,7 +371,42 @@ export default function ConfigPage() {
             <span className="form-hint">เช่น หากเลือก RN4 ระบบจะบังคับให้ในทุกเวรทำงานต้องมีพยาบาลระดับ RN4 อย่างน้อย 1 คนเสมอ</span>
           </div>
         </div>
+
+        <div className="form-row" style={{ marginTop: 'var(--space-md)' }}>
+          <div className="form-group">
+            <label className="form-label">🌙 เวรดึกสูงสุด/เดือน <code>max_night_shifts_per_month</code></label>
+            <input
+              className="form-input"
+              type="number"
+              value={config.max_night_shifts_per_month || 0}
+              onChange={(e) => handleNumberChange('max_night_shifts_per_month', e.target.value)}
+              min="0" max="31"
+            />
+            <span className="form-hint">
+              {Number(config.max_night_shifts_per_month) > 0
+                ? `⚠️ AI จะไม่จัดเวรดึกเกิน ${config.max_night_shifts_per_month} ครั้ง/คน/เดือน — ช่วยเกลี่ยค่าตอบแทนเวรดึกให้เท่าเทียม`
+                : 'ปล่อยว่างหรือ 0 = ไม่จำกัดจำนวนเวรดึก'}
+            </span>
+          </div>
+          <div className="form-group">
+            <label className="form-label">⚖️ โหมดการจัดเวร AI <code>shift_fairness_mode</code></label>
+            <select
+              className="form-select"
+              value={config.shift_fairness_mode || 'balanced'}
+              onChange={(e) => handleChange('shift_fairness_mode', e.target.value)}
+            >
+              <option value="balanced">⚖️ สมดุล (Balanced) — เกลี่ยชั่วโมงและเวรดึกให้เท่าเทียม</option>
+              <option value="maximize">🚀 อัดเวรเต็มที่ (Maximize) — จัดเวรให้เต็มที่สูงสุดโดยไม่ละเมิดกฎ</option>
+            </select>
+            <span className="form-hint">
+              {(config.shift_fairness_mode || 'balanced') === 'balanced'
+                ? '⚖️ โหมดสมดุล: AI จะเกลี่ยชั่วโมงทำงานและจำนวนเวรดึกให้ทุกคนได้รับเท่าเทียมกัน'
+                : '🚀 โหมดอัดเวร: AI จะพยายามจัดเวรให้ทุกคนได้ชั่วโมงสูงสุดเท่าที่กฎอนุญาต เหมาะเมื่อต้องการ OT มาก'}
+            </span>
+          </div>
+        </div>
       </div>
+
 
       {/* ── Section 3: Coverage Requirements ── */}
       <div className="card mb-lg">
@@ -531,6 +574,31 @@ export default function ConfigPage() {
           </div>
         </div>
       </div>
+      {/* Success Toast */}
+      {showSuccess && (
+        <div className="animate-slide-up" style={{
+          position: 'fixed', bottom: 32, right: 32, zIndex: 9999,
+          background: 'var(--color-bg-card)', border: '1px solid var(--color-success)',
+          boxShadow: 'var(--shadow-lg)', padding: '14px 24px', borderRadius: 12,
+          display: 'flex', alignItems: 'center', gap: 12
+        }}>
+          <CheckCircle size={24} style={{ color: 'var(--color-success)' }} />
+          <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{showSuccess}</span>
+        </div>
+      )}
+
+      <CustomDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        type="CONFIRM"
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        danger={confirmDialog.danger}
+        onConfirm={() => {
+          if (confirmDialog.action) confirmDialog.action();
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        }}
+      />
     </div>
   );
 }

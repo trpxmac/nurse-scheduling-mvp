@@ -23,6 +23,7 @@ export default function AIRosterPage() {
   const [loading, setLoading] = useState(true);
   const [viewMonth, setViewMonthState] = useState(loadActiveMonth());
   const [warnings, setWarnings] = useState([]);
+  const [monthlySettings, setMonthlySettings] = useState({});
 
   const setViewMonth = (m) => {
     setViewMonthState(m);
@@ -43,12 +44,13 @@ export default function AIRosterPage() {
   useEffect(() => {
     async function check() {
       if (staffList.length === 0 || shiftTypes.length === 0) return;
-      const monthlySettings = await loadMonthlySettings(viewMonth);
+      const mSettings = await loadMonthlySettings(viewMonth);
+      setMonthlySettings(mSettings);
       const aiConfig = { 
         ...config, 
         month: viewMonth,
-        roster_hours: monthlySettings.roster_hours || config.roster_hours,
-        holiday_hours: monthlySettings.holiday_hours || config.holiday_hours
+        roster_hours: mSettings.roster_hours || config.roster_hours,
+        holiday_hours: mSettings.holiday_hours || config.holiday_hours
       };
       const leaveSchedules = await loadLeaveSchedules(viewMonth);
       const lockedSlots = {};
@@ -183,27 +185,26 @@ export default function AIRosterPage() {
         </div>
       </div>
 
-      {/* Config Summary */}
-      <div className="card mb-lg" style={{ padding: 'var(--space-md)' }}>
-        <div className="flex gap-lg items-center" style={{ flexWrap: 'wrap', fontSize: '0.82rem' }}>
-          <span><strong>Mode:</strong> {config.shift_mode}</span>
-          <span><strong>บุคลากร:</strong> {activeStaff.length} คน</span>
-          <span>
-            <strong>Coverage ขั้นต่ำ:</strong>{' '}
-            {config.shift_mode === '12HR' 
-              ? `D=${config.required_D_coverage || 0}, N12=${config.required_N12_coverage || 0}`
-              : config.shift_mode === 'MIXED'
-                ? `M=${config.required_M_coverage || 0}, E=${config.required_E_coverage || 0}, N8=${config.required_N8_coverage || 0}, D=${config.required_D_coverage || 0}, N12=${config.required_N12_coverage || 0}`
-                : `M=${config.required_M_coverage || 0}, E=${config.required_E_coverage || 0}, N8=${config.required_N8_coverage || 0}`
-            }
-          </span>
-          <span><strong>พักขั้นต่ำ:</strong> {config.min_rest_hours} ชม.</span>
-          <span><strong>ทำงานสูงสุด/วัน:</strong> {config.max_daily_hours} ชม.</span>
+      {/* Monthly Settings Check */}
+      {(!(monthlySettings.roster_hours || config.roster_hours) && !(warnings.find(w => w.type === 'monthly_set'))) && (
+        <div className="card mb-lg" style={{ background: '#fffbeb', borderColor: '#fbbf24', border: '1px solid' }}>
+          <div style={{ padding: 'var(--space-md)', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+            <span style={{ fontSize: '1.4rem', flexShrink: 0 }}>⚠️</span>
+            <div>
+              <div style={{ fontWeight: 700, color: '#92400e', marginBottom: 4 }}>ยังไม่ได้กำหนด Roster Hours สำหรับ {getMonthName(viewMonth)}</div>
+              <div style={{ fontSize: '0.83rem', color: '#78350f' }}>
+                AI จะใช้โหมด <strong>"เกลี่ยเวรสมดุล"</strong> แต่ไม่สามารถคำนวณ OT ได้ถูกต้อง
+                กรุณาไปที่ <strong>ตั้งค่าหน่วยงาน → ชั่วโมงการทำงานรวม (Roster Hours)</strong> แล้วบันทึกก่อน Generate
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
+
+      {/* Feasibility Warnings */}
       {warnings.length > 0 && (
-        <div className="card mb-lg" style={{ background: '#fef2f2', borderColor: '#fca5a5' }}>
+        <div className="card mb-lg" style={{ background: '#fef2f2', border: '1px solid #fca5a5' }}>
           <div style={{ padding: 'var(--space-md)' }}>
             <h4 style={{ color: '#991b1b', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 12px 0' }}>
               <span style={{ fontSize: '1.2rem' }}>⚠️</span> คำเตือนก่อนจัดเวร: อาจเป็นไปไม่ได้ตามเป้าหมาย (Feasibility Warning)
@@ -217,12 +218,27 @@ export default function AIRosterPage() {
               ))}
             </ul>
             <div style={{ marginTop: '12px', padding: '8px', background: 'rgba(153, 27, 27, 0.05)', borderRadius: '4px', fontSize: '0.8rem', color: '#991b1b', fontWeight: 600 }}>
-              💡 คำแนะนำ: ระบบสามารถจัดเวรให้ได้ แต่อาจเกิดละเมิดกฎหมาย (ทำติดเกิน) หรือ Coverage แหว่ง แนะนำให้: 
-              ปรับเพิ่มพนักงาน, ลด Coverage, หรือ เพิ่มจำนวนเวรติดกันสูงสุด ในเมนูการตั้งค่า
+              💡 คำแนะนำ: ปรับเพิ่มบุคลากร, ลด Coverage, หรือเพิ่ม max_consecutive_workdays ในตั้งค่าหน่วยงาน
             </div>
           </div>
         </div>
       )}
+
+      {/* Config Summary Bar */}
+      <div className="card mb-lg" style={{ padding: 'var(--space-md)' }}>
+        <div className="flex gap-lg items-center" style={{ flexWrap: 'wrap', fontSize: '0.82rem' }}>
+          <span><strong>Mode:</strong> {config.shift_mode}</span>
+          <span><strong>บุคลากร:</strong> {activeStaff.length} คน</span>
+          <span><strong>Roster Hours:</strong> {(monthlySettings.roster_hours || config.roster_hours) ? `${(monthlySettings.roster_hours || config.roster_hours)} ชม.` : <span style={{ color: 'var(--color-warning, #f59e0b)' }}>ยังไม่ได้ตั้งค่า ⚠️</span>}</span>
+          <span><strong>พักขั้นต่ำ:</strong> {config.min_rest_hours} ชม.</span>
+          <span style={{ marginLeft: 'auto' }}>
+            <strong>โหมด AI:</strong>{' '}
+            <span style={{ background: (config.shift_fairness_mode || 'balanced') === 'maximize' ? 'var(--color-accent, #6366f1)' : 'var(--color-success, #10b981)', color: 'white', padding: '2px 10px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700 }}>
+              {(config.shift_fairness_mode || 'balanced') === 'maximize' ? '🚀 Maximize' : '⚖️ Balanced'}
+            </span>
+          </span>
+        </div>
+      </div>
 
       {!result && !generating && (
         <div className="card">
@@ -257,6 +273,31 @@ export default function AIRosterPage() {
 
       {result && !generating && (
         <>
+          {/* Coverage Stats Summary */}
+          {result.summary?.coverageStats && (
+            <div className="card mb-lg" style={{ padding: 'var(--space-md)' }}>
+              <div style={{ fontWeight: 700, marginBottom: 10, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+                📊 สรุป Coverage ต่อเวร
+              </div>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                {Object.entries(result.summary.coverageStats).map(([code, stat]) => (
+                  <div key={code} style={{ background: stat.rate >= 95 ? '#f0fdf4' : stat.rate >= 70 ? '#fffbeb' : '#fef2f2', border: `1px solid ${stat.rate >= 95 ? '#86efac' : stat.rate >= 70 ? '#fcd34d' : '#fca5a5'}`, borderRadius: 10, padding: '10px 18px', textAlign: 'center', minWidth: 110 }}>
+                    <div style={{ fontWeight: 800, fontSize: '1.4rem', color: stat.rate >= 95 ? '#16a34a' : stat.rate >= 70 ? '#d97706' : '#dc2626' }}>{stat.rate}%</div>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#374151' }}>เวร {code}</div>
+                    <div style={{ fontSize: '0.68rem', color: '#6b7280' }}>{stat.metDays}/{stat.totalDays} วันครบ</div>
+                  </div>
+                ))}
+                {result.summary?.nightFairness && (
+                  <div style={{ background: '#f0f9ff', border: '1px solid #7dd3fc', borderRadius: 10, padding: '10px 18px', textAlign: 'center', minWidth: 130 }}>
+                    <div style={{ fontWeight: 800, fontSize: '1.2rem', color: '#0284c7' }}>±{result.summary.nightFairness.stdDev}</div>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#374151' }}>🌙 ความสม่ำเสมอเวรดึก</div>
+                    <div style={{ fontSize: '0.68rem', color: '#6b7280' }}>เฉลี่ย {result.summary.nightFairness.avgNights} ครั้ง/คน</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* AI Score with Tiered Breakdown */}
           <div className="card mb-lg">
             <div className="ai-score-container">

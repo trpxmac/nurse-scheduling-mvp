@@ -3,6 +3,7 @@ import { Clock, Plus, Save, CheckCircle, ToggleLeft, ToggleRight, Trash2 } from 
 import { loadShiftTypes, saveShiftTypes, DEFAULT_SHIFT_TYPES } from '../utils/storage';
 import Modal from '../components/Modal';
 import ShiftBadge from '../components/ShiftBadge';
+import CustomDialog from '../components/CustomDialog';
 
 const CATEGORIES = ['DAY', 'NIGHT', 'OFF', 'LEAVE', 'OTHER'];
 
@@ -23,8 +24,9 @@ export default function ShiftTypesPage() {
   const [shiftTypes, setShiftTypes] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editIndex, setEditIndex] = useState(-1);
-  const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', danger: false, action: null });
+  const [showSuccess, setShowSuccess] = useState('');
   const [form, setForm] = useState(EMPTY_FORM);
 
   useEffect(() => {
@@ -36,27 +38,32 @@ export default function ShiftTypesPage() {
 
   if (loading) return <div className="page-container"><div className="card" style={{padding:'40px',textAlign:'center'}}>กำลังโหลดข้อมูล...</div></div>;
 
-  const handleSave = () => {
-    saveShiftTypes(shiftTypes);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
-  };
-
   const handleToggle = (index) => {
     const updated = [...shiftTypes];
     updated[index] = { ...updated[index], active: !updated[index].active };
     setShiftTypes(updated);
     saveShiftTypes(updated);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    showToast('อัปเดตสถานะเรียบร้อยแล้ว');
+  };
+
+  const showToast = (msg) => {
+    setShowSuccess(msg);
+    setTimeout(() => setShowSuccess(''), 3000);
   };
 
   const handleDelete = (index) => {
-    const updated = shiftTypes.filter((_, i) => i !== index);
-    setShiftTypes(updated);
-    saveShiftTypes(updated);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    setConfirmDialog({
+      isOpen: true,
+      title: 'ยืนยันการลบข้อมูล',
+      message: 'คุณต้องการลบประเภทเวรนี้ใช่หรือไม่?\n(หากลบแล้วจะไม่สามารถกู้คืนได้)',
+      danger: true,
+      action: () => {
+        const updated = shiftTypes.filter((_, i) => i !== index);
+        setShiftTypes(updated);
+        saveShiftTypes(updated);
+        showToast('ลบประเภทเวรเรียบร้อยแล้ว');
+      }
+    });
   };
 
   const openAddModal = () => {
@@ -99,36 +106,53 @@ export default function ShiftTypesPage() {
 
   const handleSubmitForm = () => {
     if (!form.code || !form.name) return;
-    const hours = isNoTimeShift ? (Number(form.hours) || 0) : calcHours(form.start, form.end);
-    const newShift = {
-      id: form.code,
-      code: form.code,
-      name: form.name,
-      start: isNoTimeShift ? '' : form.start,
-      end: isNoTimeShift ? '' : form.end,
-      hours,
-      active: form.active,
-      category: form.category,
-      hex: form.hex,
-    };
+    
+    setConfirmDialog({
+      isOpen: true,
+      title: editIndex >= 0 ? 'ยืนยันการแก้ไขข้อมูล' : 'ยืนยันการเพิ่มข้อมูล',
+      message: editIndex >= 0 ? 'คุณต้องการบันทึกการแก้ไขประเภทเวรนี้ใช่หรือไม่?' : 'คุณต้องการเพิ่มประเภทเวรใหม่ใช่หรือไม่?',
+      danger: false,
+      action: () => {
+        const hours = isNoTimeShift ? (Number(form.hours) || 0) : calcHours(form.start, form.end);
+        const newShift = {
+          id: form.code,
+          code: form.code,
+          name: form.name,
+          start: isNoTimeShift ? '' : form.start,
+          end: isNoTimeShift ? '' : form.end,
+          hours,
+          active: form.active,
+          category: form.category,
+          hex: form.hex,
+        };
 
-    let updated;
-    if (editIndex >= 0) {
-      updated = [...shiftTypes];
-      updated[editIndex] = newShift;
-    } else {
-      updated = [...shiftTypes, newShift];
-    }
-    setShiftTypes(updated);
-    saveShiftTypes(updated);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
-    setShowModal(false);
+        let updated;
+        if (editIndex >= 0) {
+          updated = [...shiftTypes];
+          updated[editIndex] = newShift;
+        } else {
+          updated = [...shiftTypes, newShift];
+        }
+        setShiftTypes(updated);
+        saveShiftTypes(updated);
+        setShowModal(false);
+        showToast('บันทึกประเภทเวรเรียบร้อยแล้ว');
+      }
+    });
   };
 
   const handleReset = () => {
-    setShiftTypes(DEFAULT_SHIFT_TYPES);
-    saveShiftTypes(DEFAULT_SHIFT_TYPES);
+    setConfirmDialog({
+      isOpen: true,
+      title: 'ยืนยันการรีเซ็ตข้อมูล',
+      message: 'คุณต้องการรีเซ็ตประเภทเวรทั้งหมดให้กลับเป็นค่าเริ่มต้นหรือไม่?\n(ข้อมูลเก่าจะหายทั้งหมด)',
+      danger: true,
+      action: () => {
+        setShiftTypes(DEFAULT_SHIFT_TYPES);
+        saveShiftTypes(DEFAULT_SHIFT_TYPES);
+        showToast('รีเซ็ตข้อมูลเวรเรียบร้อยแล้ว');
+      }
+    });
   };
 
   // Group for legend
@@ -149,10 +173,6 @@ export default function ShiftTypesPage() {
           <button className="btn btn-ghost" onClick={handleReset}>รีเซ็ตค่าเริ่มต้น</button>
           <button className="btn btn-ghost" onClick={openAddModal}>
             <Plus size={16} /> เพิ่มเวรใหม่
-          </button>
-          <button className="btn btn-primary" onClick={handleSave}>
-            {saved ? <CheckCircle size={16} /> : <Save size={16} />}
-            {saved ? 'บันทึกแล้ว!' : 'บันทึก'}
           </button>
         </div>
       </div>
@@ -396,6 +416,32 @@ export default function ShiftTypesPage() {
           </div>
         </div>
       </Modal>
+
+      <CustomDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        type="CONFIRM"
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        danger={confirmDialog.danger}
+        onConfirm={() => {
+          if (confirmDialog.action) confirmDialog.action();
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        }}
+      />
+
+      {/* Success Toast */}
+      {showSuccess && (
+        <div className="animate-slide-up" style={{
+          position: 'fixed', bottom: 32, right: 32, zIndex: 9999,
+          background: 'var(--color-bg-card)', border: '1px solid var(--color-success)',
+          boxShadow: 'var(--shadow-lg)', padding: '14px 24px', borderRadius: 12,
+          display: 'flex', alignItems: 'center', gap: 12
+        }}>
+          <CheckCircle size={24} style={{ color: 'var(--color-success)' }} />
+          <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{showSuccess}</span>
+        </div>
+      )}
     </div>
   );
 }
