@@ -228,60 +228,84 @@ export function generateAIRoster(staffList, shiftTypes, config, lockedSlots = {}
       dayCoverage[s.code] = 0;
     }
 
-    // Phase 1: Fill coverage requirements using RATIO-BASED priority
-    // Sort shifts by how far they are from meeting their requirement (most behind first)
-    const phase1Shifts = [...workShifts].sort((a, b) => {
-      const reqA = config[`required_${a.code}_coverage`] || 0;
-      const reqB = config[`required_${b.code}_coverage`] || 0;
-      if (reqA === 0 && reqB === 0) return b.hours - a.hours;
-      if (reqA === 0) return 1;
-      if (reqB === 0) return -1;
-      // Sort by shortage ratio: (required - current) / required
-      const ratioA = reqA > 0 ? (reqA - (dayCoverage[a.code] || 0)) / reqA : 0;
-      const ratioB = reqB > 0 ? (reqB - (dayCoverage[b.code] || 0)) / reqB : 0;
-      if (Math.abs(ratioB - ratioA) > 0.01) return ratioB - ratioA;
-      return b.hours - a.hours;
-    });
+    // Phase 1: Fill coverage requirements using RATIO-BASED ROUND-ROBIN priority
+    let madeAssignment = true;
+    while (madeAssignment && staffPool.length > 0) {
+      madeAssignment = false;
+      
+      const currentShifts = [...workShifts].filter(s => {
+         const req = config[`required_${s.code}_coverage`] || 0;
+         return req > 0 && (dayCoverage[s.code] || 0) < req;
+      }).sort((a, b) => {
+        const reqA = config[`required_${a.code}_coverage`] || 1;
+        const reqB = config[`required_${b.code}_coverage`] || 1;
+        const ratioA = (dayCoverage[a.code] || 0) / reqA;
+        const ratioB = (dayCoverage[b.code] || 0) / reqB;
+        if (Math.abs(ratioB - ratioA) > 0.01) return ratioA - ratioB; // Lower ratio first
+        
+        // Tie-breaker: prefer Night shifts because they have tighter constraints
+        const isNightA = a.category === 'NIGHT' || a.code.startsWith('N') ? 1 : 0;
+        const isNightB = b.category === 'NIGHT' || b.code.startsWith('N') ? 1 : 0;
+        if (isNightA !== isNightB) return isNightB - isNightA;
+        
+        return b.hours - a.hours;
+      });
 
-    for (const shift of phase1Shifts) {
-      const shiftCode = shift.code;
-      const required = config[`required_${shiftCode}_coverage`] || 0;
-      if (required === 0) continue;
+      if (currentShifts.length === 0) break;
 
-      while ((dayCoverage[shiftCode] || 0) < required && staffPool.length > 0) {
+      for (const shift of currentShifts) {
+        const shiftCode = shift.code;
         const assignedStaffThisShift = activeStaff.filter(s => dayAssignments[s.id] === shiftCode);
         const staffIdx = findBestStaff(staffPool, roster, shiftCode, day, shiftTypesMap, config, daysInMonth, assignedStaffThisShift, maxNightShiftsPerMonth);
+        
         if (staffIdx >= 0) {
           const staff = staffPool[staffIdx];
           roster[staff.id][day] = shiftCode;
           dayAssignments[staff.id] = shiftCode;
           dayCoverage[shiftCode] = (dayCoverage[shiftCode] || 0) + 1;
           staffPool.splice(staffIdx, 1);
-        } else {
-          break; // No valid staff for this shift, move on
+          madeAssignment = true;
+          break; // Break the for-loop to recalculate ratios
         }
       }
     }
 
     // === Phase 1.5: Coverage Backfill ===
-    // If any shift still hasn't met coverage, try harder by pulling from
-    // remaining staff who haven't been assigned yet, relaxing some preferences
-    for (const shift of phase1Shifts) {
-      const shiftCode = shift.code;
-      const required = config[`required_${shiftCode}_coverage`] || 0;
-      if (required === 0 || (dayCoverage[shiftCode] || 0) >= required) continue;
+    let madeBackfill = true;
+    while (madeBackfill && staffPool.length > 0) {
+      madeBackfill = false;
+      
+      const currentShifts = [...workShifts].filter(s => {
+         const req = config[`required_${s.code}_coverage`] || 0;
+         return req > 0 && (dayCoverage[s.code] || 0) < req;
+      }).sort((a, b) => {
+        const reqA = config[`required_${a.code}_coverage`] || 1;
+        const reqB = config[`required_${b.code}_coverage`] || 1;
+        const ratioA = (dayCoverage[a.code] || 0) / reqA;
+        const ratioB = (dayCoverage[b.code] || 0) / reqB;
+        if (Math.abs(ratioB - ratioA) > 0.01) return ratioA - ratioB;
+        
+        const isNightA = a.category === 'NIGHT' || a.code.startsWith('N') ? 1 : 0;
+        const isNightB = b.category === 'NIGHT' || b.code.startsWith('N') ? 1 : 0;
+        if (isNightA !== isNightB) return isNightB - isNightA;
+        
+        return b.hours - a.hours;
+      });
 
-      // Try staff that haven't been assigned today (from staffPool that remains)
-      while ((dayCoverage[shiftCode] || 0) < required && staffPool.length > 0) {
+      if (currentShifts.length === 0) break;
+
+      for (const shift of currentShifts) {
+        const shiftCode = shift.code;
         const assignedStaffThisShift = activeStaff.filter(s => dayAssignments[s.id] === shiftCode);
-        const staffIdx = findBestStaff(staffPool, roster, shiftCode, day, shiftTypesMap, config, daysInMonth, assignedStaffThisShift, maxNightShiftsPerMonth, true /* backfill mode */);
+        const staffIdx = findBestStaff(staffPool, roster, shiftCode, day, shiftTypesMap, config, daysInMonth, assignedStaffThisShift, maxNightShiftsPerMonth, true);
+        
         if (staffIdx >= 0) {
           const staff = staffPool[staffIdx];
           roster[staff.id][day] = shiftCode;
           dayAssignments[staff.id] = shiftCode;
           dayCoverage[shiftCode] = (dayCoverage[shiftCode] || 0) + 1;
           staffPool.splice(staffIdx, 1);
-        } else {
+          madeBackfill = true;
           break;
         }
       }
@@ -665,10 +689,21 @@ function isAssignmentValid(roster, staff, day, shiftCode, shiftTypesMap, config,
 
   // Check weekly hours limit
   if (config.max_weekly_hours) {
-    const testRoster = { ...staffRoster, [day]: shiftCode };
-    const weeks = calcWeeklyHours(testRoster, shiftTypesMap, config.month);
-    if (weeks.some(w => w.hours > config.max_weekly_hours)) {
-      return false;
+    const shiftHours = getShiftHours(shiftCode, shiftTypesMap);
+    if (shiftHours > 0) {
+      const testRoster = { ...staffRoster, [day]: shiftCode };
+      const weeksBefore = calcWeeklyHours(staffRoster, shiftTypesMap, config.month);
+      const weeksAfter = calcWeeklyHours(testRoster, shiftTypesMap, config.month);
+      
+      // Only check the week where hours actually increased
+      for (let i = 0; i < weeksAfter.length; i++) {
+        if (weeksAfter[i].hours > weeksBefore[i].hours) {
+          if (weeksAfter[i].hours > config.max_weekly_hours) {
+            return false;
+          }
+          break; // Found the affected week
+        }
+      }
     }
   }
 

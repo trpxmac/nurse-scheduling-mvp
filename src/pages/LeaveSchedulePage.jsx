@@ -457,7 +457,7 @@ export default function LeaveSchedulePage() {
             onClick={e => e.stopPropagation()}
             style={{
               position: 'fixed',
-              top: Math.min(popup.y, window.innerHeight - 420),
+              top: Math.min(popup.y, window.innerHeight - 480),
               left: Math.min(popup.x, window.innerWidth - 260),
               zIndex: 999,
               background: 'var(--color-bg-primary)',

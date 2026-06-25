@@ -396,23 +396,20 @@ export default function ResultsPage() {
                   <th>ชื่อ</th>
                   <th>ตำแหน่ง</th>
                   {activeShifts.map(st => (
-                    <th key={st.code} style={{ textAlign: 'center' }}>
+                    <th key={st.code} style={{ textAlign: 'center', padding: '8px 4px' }}>
                       <ShiftBadge code={st.code} color={st.hex} />
-                      <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginTop: '2px', fontWeight: 'normal' }}>
-                        {(st.start && st.end) ? `${st.start}-${st.end}` : ''}
-                      </div>
                     </th>
                   ))}
-                  <th style={{ borderLeft: '1px solid var(--border-color)', textAlign: 'center' }}>รวมเวรทำงาน (วัน)</th>
-                  <th style={{ textAlign: 'center' }}>ชั่วโมงทำจริงรวม (ชม.)</th>
-                  <th style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>ชม. OT</th>
+                  <th style={{ borderLeft: '1px solid var(--border-color)', textAlign: 'center' }}>รวมเวร</th>
+                  <th style={{ textAlign: 'center' }}>ชม.ทำจริง</th>
+                  <th style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>OT</th>
                 </tr>
               </thead>
               <tbody>
                 {staffShiftSummary.map(row => (
                   <tr key={row.staff.id}>
-                    <td style={{ fontWeight: 600 }}>{row.staff.firstName} {row.staff.lastName} <span style={{fontSize: '0.75rem', color: 'var(--color-text-muted)'}}>({row.staff.nickname})</span></td>
-                    <td><span className="badge badge-info">{row.staff.position}</span></td>
+                    <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{row.staff.firstName} {row.staff.lastName}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}><span className="badge badge-info">{row.staff.position}</span></td>
                     {activeShifts.map(st => (
                       <td 
                         key={st.code} 
