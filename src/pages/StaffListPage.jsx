@@ -4,8 +4,8 @@ import { loadStaffList, saveStaffList, generateStaffId, loadShiftTypes } from '.
 import Modal from '../components/Modal';
 import CustomDialog from '../components/CustomDialog';
 
-const POSITIONS = ['HOD', 'RN4', 'RN3', 'RN2', 'RN1', 'PN', 'PA', 'NA'];
-const LEVELS = ['HOD', 'RN4', 'RN3', 'RN2', 'RN1'];
+const POSITIONS = ['HOD', 'RN4', 'RN3', 'RN2', 'RN1', 'PN', 'PA', 'NA', 'Orientation Nurse', 'New Nurse'];
+const LEVELS = ['HOD', 'RN4', 'RN3', 'RN2', 'RN1', 'Orientation Nurse', 'New Nurse'];
 const EMPLOYMENT_TYPES = ['Full-time', 'Part-time'];
 
 const DAYS_OF_WEEK = [

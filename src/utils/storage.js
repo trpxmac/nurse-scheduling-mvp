@@ -35,14 +35,20 @@ export const DEFAULT_CONFIG = {
   max_consecutive_nights: 3,
   max_consecutive_workdays: 3,
   required_M_coverage: 2,
+  max_M_coverage: 0,
   required_E_coverage: 1,
+  max_E_coverage: 0,
   required_N8_coverage: 1,
+  max_N8_coverage: 0,
   required_D_coverage: 4,
+  max_D_coverage: 0,
   required_N12_coverage: 3,
+  max_N12_coverage: 0,
   incompatible_levels: [],
   required_level_every_shift: '',
   shift_fairness_mode: 'balanced', // 'balanced' | 'maximize'
   max_night_shifts_per_month: 0,  // 0 = no limit
+  hod_office_days: [1, 2, 3, 4, 5], // 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri
 };
 
 export const DEFAULT_SHIFT_TYPES = [
@@ -78,6 +84,7 @@ export const MOCK_STAFF = [
   { id: 'S15', employeeId: '600133', firstName: 'วรรณภา', lastName: 'สุขสมบูรณ์', nickname: 'แอน', position: 'PN', level: '-', active: true },
   { id: 'S16', employeeId: '548201', firstName: 'นภาพร', lastName: 'พงษ์ประเสริฐ', nickname: 'นภา', position: 'PA', level: '-', active: true },
   { id: 'S17', employeeId: '615892', firstName: 'คำศรี', lastName: 'บุญมาก', nickname: 'ศรี', position: 'PA', level: '-', active: true },
+  { id: 'S99', employeeId: '999999', firstName: 'น้องใหม่', lastName: 'พยาบาลใหม่', nickname: 'ใหม่', position: 'Orientation Nurse', level: 'Orientation Nurse', active: true },
 ];
 
 export const MOCK_ROSTER = {};
@@ -236,7 +243,13 @@ export async function saveMonthlySettings(month, settings) {
 // ---- Shift Types (Cloud) ----
 
 export async function loadShiftTypes() {
-  return fetchFromCloud(getScopedKey(SCOPED_KEYS.SHIFT_TYPES), DEFAULT_SHIFT_TYPES);
+  const activeDept = loadActiveDepartment();
+  let loaded = await fetchFromCloud(getScopedKey(SCOPED_KEYS.SHIFT_TYPES), DEFAULT_SHIFT_TYPES);
+  if (!loaded.find(s => s.code === 'O')) {
+    loaded.push({ id: 'O', code: 'O', name: 'เวร Office (HOD)', start: '08:00', end: '16:00', hours: 8, category: 'OFFICE', active: true, hex: '#F0E68C' });
+    saveToCloud(getScopedKey(SCOPED_KEYS.SHIFT_TYPES), loaded);
+  }
+  return loaded;
 }
 
 export async function saveShiftTypes(shiftTypes) {

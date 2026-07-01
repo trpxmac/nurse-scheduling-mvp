@@ -49,20 +49,27 @@ export function calcWeeklyHours(staffRoster, shiftTypesMap, yearMonth) {
   const [year, month] = yearMonth.split('-').map(Number);
   const daysInMonth = new Date(year, month, 0).getDate();
   const weeks = [];
-  let currentWeek = { weekNum: 1, hours: 0, days: [] };
+  let currentWeek = { weekNum: 1, hours: 0, workHours: 0, days: [] };
 
   for (let d = 1; d <= daysInMonth; d++) {
     const date = new Date(year, month - 1, d);
     const dow = date.getDay();
     const { shift: shiftCode, ot } = parseShift(staffRoster[d]);
     const hours = getShiftHours(shiftCode, shiftTypesMap) + ot;
+    
+    // Check if shift is actual work (not leave/off)
+    const st = shiftTypesMap[shiftCode];
+    const isWork = st && !['OFF', 'LEAVE'].includes(st.category);
+    
     currentWeek.hours += hours;
-    currentWeek.days.push({ day: d, shift: shiftCode, ot, hours });
+    if (isWork) currentWeek.workHours += hours;
+    
+    currentWeek.days.push({ day: d, shift: shiftCode, ot, hours, isWork });
 
     // Week ends on Saturday (6) or last day of month
     if (dow === 6 || d === daysInMonth) {
       weeks.push({ ...currentWeek });
-      currentWeek = { weekNum: currentWeek.weekNum + 1, hours: 0, days: [] };
+      currentWeek = { weekNum: currentWeek.weekNum + 1, hours: 0, workHours: 0, days: [] };
     }
   }
   return weeks;
@@ -188,11 +195,13 @@ export function checkCoverageRequirements(coverage, config) {
   for (const [day, shifts] of Object.entries(coverage)) {
     const details = {};
     let allMet = true;
-    for (const [shiftCode, required] of Object.entries(requirements)) {
+    for (const shiftCode of Object.keys(requirements)) {
+      const required = requirements[shiftCode];
+      const max = config[`max_${shiftCode}_coverage`] || 0;
       const actual = shifts[shiftCode] || 0;
-      const met = actual >= required;
+      const met = actual >= required && (max === 0 || actual <= max);
       if (!met) allMet = false;
-      details[shiftCode] = { actual, required, met };
+      details[shiftCode] = { actual, required, max, met };
     }
     results[day] = { met: allMet, details };
   }
@@ -242,7 +251,7 @@ export function countViolations(roster, staffList, shiftTypesMap, config, yearMo
     // Weekly hours
     const weeks = calcWeeklyHours(staffRoster, shiftTypesMap, yearMonth);
     for (const week of weeks) {
-      if (week.hours > config.max_weekly_hours) {
+      if (week.workHours > Number(config.max_weekly_hours || 52)) {
         totalOverweekly++;
       }
     }
@@ -300,13 +309,11 @@ export function detectConsecutiveWorkdays(staffRoster, shiftTypesMap, maxConsecu
   if (!yearMonth) return [];
   const [year, month] = yearMonth.split('-').map(Number);
   const daysInMonth = new Date(year, month, 0).getDate();
-  const NON_WORK = ['OFF', 'LEAVE'];
-
   const isWork = (code) => {
     if (!code || code === '') return false;
     const st = shiftTypesMap[code];
     if (!st) return false;
-    return !NON_WORK.includes(st.category);
+    return st.category === 'DAY' || st.category === 'NIGHT';
   };
 
   const violations = [];
@@ -365,8 +372,8 @@ export function buildStaffValidation(roster, staffList, shiftTypesMap, config, y
 
     const totalHours = calcMonthlyHours(sr, shiftTypesMap);
     const weeks = calcWeeklyHours(sr, shiftTypesMap, yearMonth);
-    const weeklyViolations = weeks.filter(w => w.hours > (config.max_weekly_hours || 52));
-    const maxWeeklyHours = weeks.reduce((m, w) => Math.max(m, w.hours), 0);
+    const weeklyViolations = weeks.filter(w => w.workHours > Number(config.max_weekly_hours || 52));
+    const maxWeeklyHours = weeks.reduce((max, w) => Math.max(max, w.workHours), 0);
     const maxWeeklyOk = weeklyViolations.length === 0;
 
     const quickReturns = detectQuickReturns(sr, shiftTypesMap, config.min_rest_hours || 11, yearMonth);
@@ -378,13 +385,16 @@ export function buildStaffValidation(roster, staffList, shiftTypesMap, config, y
 
     // Build Red Flag text list
     const redFlags = [];
-    if (weeklyViolations.length > 0) redFlags.push(`MaxWeekHrs:OK>${config.max_weekly_hours}`);
-    if (quickReturns.length > 0) redFlags.push(`WorkRun:>${config.min_rest_hours}`);
+    if (weeklyViolations.length > 0) redFlags.push(`MaxWeekHrs:${maxWeeklyHours}>${config.max_weekly_hours}`);
+    if (quickReturns.length > 0) redFlags.push(`QuickReturn:<${config.min_rest_hours}h`);
     if (nightRunViolations.length > 0) redFlags.push(`NightRun:>${config.max_consecutive_nights}`);
     if (workRunViolations.length > 0) redFlags.push(`WorkDays:>${config.max_consecutive_workdays}`);
     if (dailyViolations.length > 0) redFlags.push(`MaxDaily:>${config.max_daily_hours}`);
     // Always mark as WeekViolation for demo visibility (matching screenshot)
-    if (weeklyViolations.length > 0) redFlags.push(`WeekViolation:${weeklyViolations.length}`);
+    if (weeklyViolations.length > 0) {
+      const weekNums = weeklyViolations.map(w => `W${w.weekNum}`).join(',');
+      redFlags.push(`WeekViolation:${weekNums}`);
+    }
 
     const hasViolation = redFlags.length > 0;
     const overallStatus = hasViolation ? 'REVIEW' : 'OK';

@@ -444,7 +444,8 @@ export default function AIRosterPage() {
                         key={d}
                         style={{
                           background: isWeekend(viewMonth, d) ? '#fef3c7' : undefined,
-                          minWidth: 36,
+                          minWidth: 24,
+                          padding: '0 2px',
                         }}
                       >
                         <div>{d}</div>

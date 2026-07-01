@@ -47,7 +47,26 @@ export default function ConfigPage() {
   const handleChange = (field, value) => {
     setConfig(prev => {
       const next = { ...prev, [field]: value };
-      // Removed auto-save here to prevent accidental configuration changes
+
+      if (field === 'shift_mode') {
+        if (value === '12HR') {
+          // 12HR mode only uses D, N12 → zero out 8HR coverage
+          next.required_M_coverage = 0;
+          next.max_M_coverage = 0;
+          next.required_E_coverage = 0;
+          next.max_E_coverage = 0;
+          next.required_N8_coverage = 0;
+          next.max_N8_coverage = 0;
+        } else if (value === '8HR') {
+          // 8HR mode only uses M, E, N8 → zero out 12HR coverage
+          next.required_D_coverage = 0;
+          next.max_D_coverage = 0;
+          next.required_N12_coverage = 0;
+          next.max_N12_coverage = 0;
+        }
+        // MIXED keeps all values as-is
+      }
+
       return next;
     });
     
@@ -407,6 +426,41 @@ export default function ConfigPage() {
         </div>
       </div>
 
+      {/* ── Section 2.5: HOD Settings ── */}
+      <div className="card mb-lg">
+        <div className="card-header">
+          <div className="card-title">
+            <Users size={18} /> ตั้งค่าเวร Office สำหรับ Head of Department (HOD)
+          </div>
+        </div>
+        <div style={{ padding: '0 var(--space-lg) var(--space-md)' }}>
+          <label className="form-label">วันที่ลงเวร Office อัตโนมัติ (ไม่นับเป็น Coverage ขั้นต่ำ แต่ชั่วโมงรวมนับปกติ)</label>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '8px' }}>
+            {[{v: 1, l: 'จันทร์'}, {v: 2, l: 'อังคาร'}, {v: 3, l: 'พุธ'}, {v: 4, l: 'พฤหัสฯ'}, {v: 5, l: 'ศุกร์'}, {v: 6, l: 'เสาร์'}, {v: 0, l: 'อาทิตย์'}].map(d => (
+              <label key={d.v} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', background: 'var(--color-bg-secondary)', padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <input
+                  type="checkbox"
+                  checked={(config.hod_office_days || []).includes(d.v)}
+                  onChange={(e) => {
+                    const current = config.hod_office_days || [];
+                    if (e.target.checked) {
+                      handleChange('hod_office_days', [...current, d.v]);
+                    } else {
+                      handleChange('hod_office_days', current.filter(x => x !== d.v));
+                    }
+                  }}
+                  style={{ width: '16px', height: '16px', accentColor: 'var(--color-primary)' }}
+                />
+                <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{d.l}</span>
+              </label>
+            ))}
+          </div>
+          <p className="form-hint" style={{ marginTop: '12px' }}>
+            ⚠️ การตั้งค่านี้จะใช้เมื่อกด <b>Generate (จัดเวรอัตโนมัติ)</b> โดยระบบจะล็อคเวร <b>"O (Office)"</b> ให้กับบุคลากรระดับ HOD ตามวันที่เลือก
+          </p>
+        </div>
+      </div>
+
 
       {/* ── Section 3: Coverage Requirements ── */}
       <div className="card mb-lg">
@@ -429,44 +483,50 @@ export default function ConfigPage() {
               <div className="form-group">
                 <label className="form-label">
                   <span className="badge badge-M" style={{ marginRight: 8 }}>M</span>
-                  เวรเช้า 07:00–15:00 <code>required_M_coverage</code>
+                  เวรเช้า 07:00–15:00
                 </label>
-                <input
-                  className="form-input"
-                  type="number"
-                  value={config.required_M_coverage}
-                  onChange={(e) => handleNumberChange('required_M_coverage', e.target.value)}
-                  min="0" max="50"
-                />
-                <span className="form-hint">คนขั้นต่ำ/วัน</span>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <div>
+                    <input className="form-input" type="number" value={config.required_M_coverage} onChange={(e) => handleNumberChange('required_M_coverage', e.target.value)} min="0" max="50" placeholder="ขั้นต่ำ" title="ขั้นต่ำ" />
+                    <div className="form-hint" style={{ marginTop: '4px' }}>ขั้นต่ำ</div>
+                  </div>
+                  <div>
+                    <input className="form-input" type="number" value={config.max_M_coverage} onChange={(e) => handleNumberChange('max_M_coverage', e.target.value)} min="0" max="50" placeholder="สูงสุด (0=ไม่จำกัด)" title="สูงสุด (0=ไม่จำกัด)" />
+                    <div className="form-hint" style={{ marginTop: '4px' }}>สูงสุด (0=ไม่จำกัด)</div>
+                  </div>
+                </div>
               </div>
               <div className="form-group">
                 <label className="form-label">
                   <span className="badge badge-E" style={{ marginRight: 8 }}>E</span>
-                  เวรบ่าย 15:00–23:00 <code>required_E_coverage</code>
+                  เวรบ่าย 15:00–23:00
                 </label>
-                <input
-                  className="form-input"
-                  type="number"
-                  value={config.required_E_coverage}
-                  onChange={(e) => handleNumberChange('required_E_coverage', e.target.value)}
-                  min="0" max="50"
-                />
-                <span className="form-hint">คนขั้นต่ำ/วัน</span>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <div>
+                    <input className="form-input" type="number" value={config.required_E_coverage} onChange={(e) => handleNumberChange('required_E_coverage', e.target.value)} min="0" max="50" placeholder="ขั้นต่ำ" title="ขั้นต่ำ" />
+                    <div className="form-hint" style={{ marginTop: '4px' }}>ขั้นต่ำ</div>
+                  </div>
+                  <div>
+                    <input className="form-input" type="number" value={config.max_E_coverage} onChange={(e) => handleNumberChange('max_E_coverage', e.target.value)} min="0" max="50" placeholder="สูงสุด (0=ไม่จำกัด)" title="สูงสุด (0=ไม่จำกัด)" />
+                    <div className="form-hint" style={{ marginTop: '4px' }}>สูงสุด (0=ไม่จำกัด)</div>
+                  </div>
+                </div>
               </div>
               <div className="form-group">
                 <label className="form-label">
                   <span className="badge badge-N8" style={{ marginRight: 8 }}>N8</span>
-                  เวรดึก 23:00–07:00 <code>required_N8_coverage</code>
+                  เวรดึก 23:00–07:00
                 </label>
-                <input
-                  className="form-input"
-                  type="number"
-                  value={config.required_N8_coverage}
-                  onChange={(e) => handleNumberChange('required_N8_coverage', e.target.value)}
-                  min="0" max="50"
-                />
-                <span className="form-hint">คนขั้นต่ำ/วัน</span>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <div>
+                    <input className="form-input" type="number" value={config.required_N8_coverage} onChange={(e) => handleNumberChange('required_N8_coverage', e.target.value)} min="0" max="50" placeholder="ขั้นต่ำ" title="ขั้นต่ำ" />
+                    <div className="form-hint" style={{ marginTop: '4px' }}>ขั้นต่ำ</div>
+                  </div>
+                  <div>
+                    <input className="form-input" type="number" value={config.max_N8_coverage} onChange={(e) => handleNumberChange('max_N8_coverage', e.target.value)} min="0" max="50" placeholder="สูงสุด (0=ไม่จำกัด)" title="สูงสุด (0=ไม่จำกัด)" />
+                    <div className="form-hint" style={{ marginTop: '4px' }}>สูงสุด (0=ไม่จำกัด)</div>
+                  </div>
+                </div>
               </div>
             </div>
           </>
@@ -482,30 +542,34 @@ export default function ConfigPage() {
               <div className="form-group">
                 <label className="form-label">
                   <span className="badge badge-D" style={{ marginRight: 8 }}>D</span>
-                  เวร D (12ชม.กลางวัน) 07:00–19:00 <code>required_D_coverage</code>
+                  เวร D (12ชม.กลางวัน) 07:00–19:00
                 </label>
-                <input
-                  className="form-input"
-                  type="number"
-                  value={config.required_D_coverage}
-                  onChange={(e) => handleNumberChange('required_D_coverage', e.target.value)}
-                  min="0" max="50"
-                />
-                <span className="form-hint">คนขั้นต่ำ/วัน</span>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <div>
+                    <input className="form-input" type="number" value={config.required_D_coverage} onChange={(e) => handleNumberChange('required_D_coverage', e.target.value)} min="0" max="50" placeholder="ขั้นต่ำ" title="ขั้นต่ำ" />
+                    <div className="form-hint" style={{ marginTop: '4px' }}>ขั้นต่ำ</div>
+                  </div>
+                  <div>
+                    <input className="form-input" type="number" value={config.max_D_coverage} onChange={(e) => handleNumberChange('max_D_coverage', e.target.value)} min="0" max="50" placeholder="สูงสุด (0=ไม่จำกัด)" title="สูงสุด (0=ไม่จำกัด)" />
+                    <div className="form-hint" style={{ marginTop: '4px' }}>สูงสุด (0=ไม่จำกัด)</div>
+                  </div>
+                </div>
               </div>
               <div className="form-group">
                 <label className="form-label">
                   <span className="badge badge-N12" style={{ marginRight: 8 }}>N12</span>
-                  เวร N12 (12ชม.กลางคืน) 19:00–07:00 <code>required_N12_coverage</code>
+                  เวร N12 (12ชม.กลางคืน) 19:00–07:00
                 </label>
-                <input
-                  className="form-input"
-                  type="number"
-                  value={config.required_N12_coverage}
-                  onChange={(e) => handleNumberChange('required_N12_coverage', e.target.value)}
-                  min="0" max="50"
-                />
-                <span className="form-hint">คนขั้นต่ำ/วัน</span>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <div>
+                    <input className="form-input" type="number" value={config.required_N12_coverage} onChange={(e) => handleNumberChange('required_N12_coverage', e.target.value)} min="0" max="50" placeholder="ขั้นต่ำ" title="ขั้นต่ำ" />
+                    <div className="form-hint" style={{ marginTop: '4px' }}>ขั้นต่ำ</div>
+                  </div>
+                  <div>
+                    <input className="form-input" type="number" value={config.max_N12_coverage} onChange={(e) => handleNumberChange('max_N12_coverage', e.target.value)} min="0" max="50" placeholder="สูงสุด (0=ไม่จำกัด)" title="สูงสุด (0=ไม่จำกัด)" />
+                    <div className="form-hint" style={{ marginTop: '4px' }}>สูงสุด (0=ไม่จำกัด)</div>
+                  </div>
+                </div>
               </div>
             </div>
           </>

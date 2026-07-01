@@ -5,14 +5,15 @@ import {
   loadConfig, loadShiftTypes, loadStaffList,
   loadMonthlyRoster, saveMonthlyRoster,
   getDaysInMonth, getDayOfWeek, isWeekend, getMonthName,
-  loadActiveMonth, saveActiveMonth, loadMonthlySettings
+  loadActiveMonth, saveActiveMonth, loadMonthlySettings, loadLeaveSchedules
 } from '../utils/storage';
 import MonthSelector from '../components/MonthSelector';
 import CustomDialog from '../components/CustomDialog';
 import {
   buildShiftTypesMap, calcMonthlyHours, detectQuickReturns,
   calcDailyCoverage, checkCoverageRequirements, parseShift,
-  getShiftHours, filterActiveShifts
+  getShiftHours, filterActiveShifts, calcWeeklyHours,
+  detectConsecutiveNights, detectConsecutiveWorkdays, detectMaxDailyHours
 } from '../utils/scheduling';
 
 export default function MonthlyRosterPage() {
@@ -24,6 +25,7 @@ export default function MonthlyRosterPage() {
   const [loading, setLoading] = useState(true);
   const [viewMonth, setViewMonthState] = useState(loadActiveMonth());
   const [monthlySettings, setMonthlySettings] = useState({});
+  const [leaveSchedules, setLeaveSchedules] = useState([]);
   const [dialog, setDialog] = useState({ isOpen: false, type: 'CONFIRM', title: '', message: '', onConfirm: null, danger: false });
   const [selectedStaffForModal, setSelectedStaffForModal] = useState(null);
   const [showSuccess, setShowSuccess] = useState('');
@@ -45,6 +47,7 @@ export default function MonthlyRosterPage() {
       setViewMonth(month);
       setRoster(await loadMonthlyRoster(month));
       setMonthlySettings(await loadMonthlySettings(month) || {});
+      setLeaveSchedules(await loadLeaveSchedules(month));
       setLoading(false);
     }
     init();
@@ -56,6 +59,7 @@ export default function MonthlyRosterPage() {
       async function reload() {
         setRoster(await loadMonthlyRoster(viewMonth));
         setMonthlySettings(await loadMonthlySettings(viewMonth) || {});
+        setLeaveSchedules(await loadLeaveSchedules(viewMonth));
         setSaved(false);
       }
       reload();
@@ -69,15 +73,100 @@ export default function MonthlyRosterPage() {
   const daysInMonth = useMemo(() => getDaysInMonth(viewMonth), [viewMonth]);
   const days = useMemo(() => Array.from({ length: daysInMonth }, (_, i) => i + 1), [daysInMonth]);
 
-  // Calculate violations for each staff
+  const lockedSlots = useMemo(() => {
+    const map = {};
+    for (const sch of leaveSchedules) {
+      if (!map[sch.staffId]) map[sch.staffId] = {};
+      for (let d = sch.startDay; d <= sch.endDay; d++) {
+        map[sch.staffId][d] = sch.shiftCode;
+      }
+    }
+    return map;
+  }, [leaveSchedules]);
+
+  // Calculate violations for each staff with details for tooltip
   const violations = useMemo(() => {
     const v = {};
     for (const staff of activeStaff) {
-      const qr = detectQuickReturns(roster[staff.id] || {}, shiftTypesMap, config.min_rest_hours, viewMonth);
-      v[staff.id] = new Set(qr.map(viol => viol.day));
+      const staffId = staff.id;
+      const sr = roster[staffId] || {};
+      v[staffId] = {}; // Map of day -> array of error messages
+
+      const addViolation = (day, msg) => {
+        if (!v[staffId][day]) v[staffId][day] = [];
+        if (!v[staffId][day].includes(msg)) v[staffId][day].push(msg);
+      };
+
+      // Quick Returns
+      const qr = detectQuickReturns(sr, shiftTypesMap, config.min_rest_hours || 11, viewMonth);
+      for (const viol of qr) {
+        addViolation(viol.day, `⚠️ พักน้อยกว่า ${config.min_rest_hours || 11} ชม. (ลงเวร ${viol.prevShift} ขึ้นเวร ${viol.currentShift} พักจริง ${viol.restHours} ชม.)`);
+      }
+
+      // Consecutive Nights
+      const maxNights = config.max_consecutive_nights || 3;
+      const nightRun = detectConsecutiveNights(sr, shiftTypesMap, maxNights, viewMonth);
+      for (const run of nightRun) {
+        for (let d = run.startDay; d <= run.endDay; d++) {
+          addViolation(d, `⚠️ เวรดึกติดกันเกิน ${maxNights} วัน (ติดกัน ${run.count} วัน)`);
+        }
+      }
+
+      // Consecutive Workdays
+      const maxWork = config.max_consecutive_workdays || 5;
+      const workRun = detectConsecutiveWorkdays(sr, shiftTypesMap, maxWork, viewMonth);
+      for (const run of workRun) {
+        for (let d = run.startDay; d <= run.endDay; d++) {
+          addViolation(d, `⚠️ ทำงานติดกันเกิน ${maxWork} วัน (ติดกัน ${run.count} วัน)`);
+        }
+      }
+
+      // Max Daily Hours
+      const maxDaily = config.max_daily_hours || 12;
+      const dailyHours = detectMaxDailyHours(sr, shiftTypesMap, maxDaily);
+      for (const viol of dailyHours) {
+        addViolation(viol.day, `⚠️ ทำงานเกิน ${maxDaily} ชม. ในหนึ่งวัน (ทำจริง ${viol.hours} ชม.)`);
+      }
     }
     return v;
-  }, [roster, activeStaff, shiftTypesMap, config]);
+  }, [roster, activeStaff, shiftTypesMap, config, viewMonth]);
+
+  // Per-staff comprehensive validation (real-time)
+  const staffValidations = useMemo(() => {
+    const result = {};
+    for (const staff of activeStaff) {
+      const sr = roster[staff.id] || {};
+      const issues = [];
+
+      // Quick Returns
+      const qr = detectQuickReturns(sr, shiftTypesMap, config.min_rest_hours || 11, viewMonth);
+      if (qr.length > 0) issues.push(`พักไม่พอ ${qr.length} ครั้ง`);
+
+      // Weekly hours
+      const weeks = calcWeeklyHours(sr, shiftTypesMap, viewMonth);
+      const weeklyOver = weeks.filter(w => w.workHours > Number(config.max_weekly_hours || 52));
+      if (weeklyOver.length > 0) {
+        const maxW = weeks.reduce((m, w) => Math.max(m, w.workHours), 0);
+        issues.push(`สัปดาห์เกิน (${maxW} ชม.)`);
+      }
+
+      // Consecutive nights
+      const nightRun = detectConsecutiveNights(sr, shiftTypesMap, config.max_consecutive_nights || 3, viewMonth);
+      if (nightRun.length > 0) issues.push(`ดึกติดเกิน (${nightRun.length} ครั้ง)`);
+
+      // Consecutive workdays
+      const workRun = detectConsecutiveWorkdays(sr, shiftTypesMap, config.max_consecutive_workdays || 5, viewMonth);
+      if (workRun.length > 0) issues.push(`ทำติดเกิน (${workRun.length} ครั้ง)`);
+
+      // Daily hours
+      const maxDaily = config.max_daily_hours || 12;
+      const dailyHours = detectMaxDailyHours(sr, shiftTypesMap, maxDaily);
+      if (dailyHours.length > 0) issues.push(`วันเกิน (${dailyHours.length} ครั้ง)`);
+
+      result[staff.id] = issues;
+    }
+    return result;
+  }, [roster, activeStaff, shiftTypesMap, config, viewMonth]);
 
   // Daily coverage
   const coverage = useMemo(() => {
@@ -95,13 +184,13 @@ export default function MonthlyRosterPage() {
       roles.add(staff.level && staff.level !== '-' ? staff.level : staff.position);
     }
     // Sort roles so RN4 comes before RN3, etc. Reverse alphabetical works well for RN4...RN1, PN, PA.
-    return Array.from(roles).sort().reverse();
+    return Array.from(roles).filter(r => r !== 'HOD').sort().reverse();
   }, [activeStaff]);
 
   const dailyStaffCounts = useMemo(() => {
     const counts = {};
     days.forEach(d => {
-      counts[d] = { total: 0, roles: {} };
+      counts[d] = { total: 0, roles: {}, officeTotal: 0, hodTotal: 0 };
     });
     
     for (const staff of activeStaff) {
@@ -112,8 +201,14 @@ export default function MonthlyRosterPage() {
         if (shift && shift !== '') {
           const st = shiftTypesMap[shift];
           if (st && st.hours > 0) {
-            counts[d].total++;
-            counts[d].roles[role] = (counts[d].roles[role] || 0) + 1;
+            if (role === 'HOD') counts[d].hodTotal++;
+            
+            if (st.category === 'OFFICE') {
+              counts[d].officeTotal++;
+            } else {
+              counts[d].total++;
+              counts[d].roles[role] = (counts[d].roles[role] || 0) + 1;
+            }
           }
         }
       }
@@ -155,8 +250,8 @@ export default function MonthlyRosterPage() {
       danger: true,
       confirmText: 'ล้างข้อมูล',
       onConfirm: () => {
-        setRoster({});
-        saveMonthlyRoster({}, viewMonth);
+        setRoster(lockedSlots);
+        saveMonthlyRoster(lockedSlots, viewMonth);
         showToast('ล้างตารางเวรเรียบร้อยแล้ว');
         closeDialog();
       }
@@ -194,7 +289,21 @@ export default function MonthlyRosterPage() {
       <div className="page-header" style={{ marginBottom: '8px' }}>
         <div className="page-header-left" style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
           <h1 style={{ fontSize: '1.2rem', margin: 0 }}>📅 จัดตารางเวร</h1>
-          <p style={{ margin: 0, fontSize: '0.8rem' }}>{config.unit_name ? `${config.unit_name} — ` : ''}{config.hospital_name} | บุคลากร {activeStaff.length} คน | {daysInMonth} วัน</p>
+          <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--color-text-muted)', display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <span>{config.unit_name ? `${config.unit_name} — ` : ''}{config.hospital_name}</span>
+            <span>|</span>
+            <span>บุคลากร {activeStaff.length} คน</span>
+            <span>|</span>
+            <span>{daysInMonth} วัน</span>
+            <span>|</span>
+            <span style={{ fontWeight: 600 }}>Roster Hours: {monthlySettings.roster_hours || config.roster_hours || 0} ชม.</span>
+            {(monthlySettings.holiday_hours > 0 || config.holiday_hours > 0) && (
+              <>
+                <span>|</span>
+                <span style={{ fontWeight: 600, color: 'var(--color-warning)' }}>Holiday: {monthlySettings.holiday_hours || config.holiday_hours} ชม.</span>
+              </>
+            )}
+          </p>
         </div>
         <div className="page-header-actions">
           <MonthSelector value={viewMonth} onChange={setViewMonth} />
@@ -239,7 +348,8 @@ export default function MonthlyRosterPage() {
                     key={d}
                     style={{
                       background: isWeekend(viewMonth, d) ? '#fef3c7' : undefined,
-                      minWidth: 36,
+                      minWidth: 24,
+                      padding: '0 2px',
                     }}
                   >
                     <div>{d}</div>
@@ -265,26 +375,34 @@ export default function MonthlyRosterPage() {
                 const targetHrs = Number(monthlySettings.roster_hours) || 0;
                 const finalOt = targetHrs > 0 ? Math.max(0, (shiftHours + manualOt) - targetHrs) : manualOt;
                 const totalHours = shiftHours + manualOt;
-                const staffViolations = violations[staff.id] || new Set();
+                const staffViolations = violations[staff.id] || {};
 
                 return (
                   <tr key={staff.id}>
-                    <td className="staff-name-cell hover-bg-light" title={`คลิกเพื่อดูตารางเวรของ ${staff.firstName} ${staff.lastName}`} onClick={() => setSelectedStaffForModal(staff)} style={{ cursor: 'pointer', transition: 'background 0.2s' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontWeight: 600, fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <Search size={12} style={{ color: 'var(--color-primary)', opacity: 0.7 }} />
-                          {staff.firstName} {staff.lastName}
+                    <td className="staff-name-cell hover-bg-light" title={staffValidations[staff.id]?.length > 0 ? `⚠️ ${staffValidations[staff.id].join(', ')}` : `คลิกเพื่อดูตารางเวรของ ${staff.firstName} ${staff.lastName}`} onClick={() => setSelectedStaffForModal(staff)} style={{ cursor: 'pointer', transition: 'background 0.2s' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ fontWeight: 600, fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          {staffValidations[staff.id]?.length > 0
+                            ? <span style={{ color: 'var(--color-danger)', fontSize: '0.7rem', flexShrink: 0 }}>⚠️</span>
+                            : <Search size={12} style={{ color: 'var(--color-primary)', opacity: 0.7 }} />}
+                          {staff.nickname || staff.firstName}
                         </span>
                         <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', fontWeight: 700, flexShrink: 0 }}>{staff.level && staff.level !== '-' ? staff.level : staff.position}</span>
                       </div>
                     </td>
-                    {days.map(d => (
+                    {days.map(d => {
+                      const dayViolations = staffViolations[d];
+                      const isLocked = lockedSlots[staff.id]?.[d];
+                      return (
                       <td
                         key={d}
-                        className={staffViolations.has(d) ? 'violation-cell' : ''}
+                        className={dayViolations ? 'violation-cell' : ''}
                         style={{
                           background: isWeekend(viewMonth, d) ? 'rgba(245,158,11,0.04)' : undefined,
+                          backgroundImage: isLocked ? 'radial-gradient(var(--color-text-muted) 1px, transparent 1px)' : undefined,
+                          backgroundSize: isLocked ? '4px 4px' : undefined,
                         }}
+                        title={dayViolations ? dayViolations.join('\n') : (isLocked ? 'ดึงจากกำหนดช่วงลา/อบรม' : undefined)}
                       >
                         {(() => {
                           const { shift, ot, otType } = parseShift(staffRoster[d]);
@@ -300,6 +418,7 @@ export default function MonthlyRosterPage() {
                                   color: shift && shift !== '-' ? '#1e293b' : 'inherit',
                                   fontWeight: shift && shift !== '-' ? '700' : 'normal'
                                 }}
+                                title={dayViolations ? dayViolations.join('\n') : undefined}
                               >
                                 <option value="">-</option>
                                 {activeShifts.map(st => (
@@ -310,7 +429,7 @@ export default function MonthlyRosterPage() {
                           );
                         })()}
                       </td>
-                    ))}
+                    )})}
                     <td className="total-cell" style={{ fontWeight: 600, color: 'var(--color-primary-dark)', background: 'rgba(59,130,246,0.05)', borderLeft: '1px solid var(--border-color)' }}>
                       {totalHours}
                     </td>
@@ -327,19 +446,22 @@ export default function MonthlyRosterPage() {
                 let coverageShifts = [];
                 if (mode === '8HR' || mode === 'MIXED') coverageShifts.push('M', 'E', 'N8');
                 if (mode === '12HR' || mode === 'MIXED') coverageShifts.push('D', 'N12');
+                if (shiftTypesMap['O']) coverageShifts.push('O');
                 return coverageShifts;
               })().map(shiftCode => {
                 if (!shiftTypesMap[shiftCode]?.active) return null;
                 const required = config[`required_${shiftCode}_coverage`] || 0;
+                const max = config[`max_${shiftCode}_coverage`] || 0;
+                const rangeLabel = max > 0 ? `ขั้นต่ำ ${required}, สูงสุด ${max}` : `ขั้นต่ำ ${required}`;
                 return (
                   <tr key={`cov-${shiftCode}`} className="coverage-row">
                     <td className="staff-name-cell" style={{ background: 'var(--color-bg-tertiary)' }}>
                       <span className={`badge badge-${shiftCode}`} style={{ ...(shiftTypesMap[shiftCode]?.hex ? { backgroundColor: `${shiftTypesMap[shiftCode].hex}35`, color: '#1e293b', borderColor: `${shiftTypesMap[shiftCode].hex}60` } : {}), marginRight: 4 }}>{shiftCode}</span>
-                      <span style={{ fontSize: '0.68rem' }}>ขั้นต่ำ {required}</span>
+                      {shiftCode !== 'O' && <span style={{ fontSize: '0.68rem' }}>{rangeLabel}</span>}
                     </td>
                     {days.map(d => {
                       const actual = coverage[d]?.[shiftCode] || 0;
-                      const met = actual >= required;
+                      const met = actual >= required && (max === 0 || actual <= max);
                       return (
                         <td key={d} className={met ? 'coverage-ok' : 'coverage-warn'}>
                           {actual}
@@ -448,7 +570,9 @@ export default function MonthlyRosterPage() {
                  const { shift, ot } = parseShift(cell);
                  const st = shiftTypesMap[shift];
                  const isWknd = isWeekend(viewMonth, d);
-                 const hasViol = violations[selectedStaffForModal.id]?.has(d);
+                 const dayViolations = violations[selectedStaffForModal.id]?.[d];
+                 const hasViol = !!dayViolations;
+                 const isLocked = lockedSlots[selectedStaffForModal.id]?.[d];
                  
                  return (
                    <div key={d} style={{ 
@@ -457,12 +581,15 @@ export default function MonthlyRosterPage() {
                      padding: '6px', 
                      textAlign: 'center', 
                      background: hasViol ? 'rgba(239, 68, 68, 0.05)' : (isWknd ? 'rgba(245, 158, 11, 0.05)' : 'white'), 
+                     backgroundImage: isLocked ? 'radial-gradient(var(--color-text-muted) 1px, transparent 1px)' : undefined,
+                     backgroundSize: isLocked ? '4px 4px' : undefined,
                      minHeight: '75px', 
                      display: 'flex', 
                      flexDirection: 'column',
                      boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-                   }}>
-                     <div style={{ fontSize: '0.75rem', color: isWknd ? 'var(--color-accent)' : 'var(--color-text-muted)', marginBottom: '6px', fontWeight: 600 }}>{d}</div>
+                   }}
+                   title={hasViol ? dayViolations.join('\n') : (isLocked ? 'ดึงจากกำหนดช่วงลา/อบรม' : undefined)}>
+                     <div style={{ fontSize: '0.75rem', color: isWknd ? 'var(--color-accent)' : 'var(--color-text-muted)', marginBottom: '6px', fontWeight: 600, background: isLocked ? 'rgba(255,255,255,0.7)' : 'transparent', borderRadius: '4px', display: 'inline-block', padding: '0 4px', alignSelf: 'center' }}>{d}</div>
                      {shift && shift !== '-' ? (
                        <div className={`badge badge-${shift}`} style={{ ...(st?.hex ? { backgroundColor: `${st.hex}35`, color: '#1e293b', borderColor: `${st.hex}60` } : {}), margin: 'auto', width: '100%', display: 'flex', flexDirection: 'column', padding: '6px 2px', lineHeight: 1.2 }}>
                          <span style={{ fontSize: '1.1rem', fontWeight: 800 }}>{shift}</span>

@@ -9,7 +9,7 @@
 
 /* ---- Sidebar ---- */
 .sidebar {
-  width: 290px;
+  width: 250px;
   min-height: 100vh;
   background: #0f172a; /* Deep slate blue for a premium high-contrast dark theme */
   border-right: 1px solid rgba(255, 255, 255, 0.08);
@@ -66,27 +66,27 @@
   padding: var(--space-md);
   display: flex;
   flex-direction: column;
-  gap: 8px; /* More spacing between items for seniors */
+  gap: 4px; /* More spacing between items for seniors */
   overflow-y: auto;
 }
 
 .nav-section-label {
-  font-size: 0.85rem; /* Larger label font */
+  font-size: 0.8rem; /* Larger label font */
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: #94a3b8; /* High-contrast light gray on dark BG */
-  padding: 16px 8px 8px;
+  padding: 12px 8px 6px;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 12px; /* Wider spacing */
-  padding: 12px 16px; /* Larger click targets for elder users */
+  gap: 10px; /* Wider spacing */
+  padding: 10px 14px; /* Larger click targets for elder users */
   border-radius: var(--radius-md);
   color: #e2e8f0; /* Crisp Slate-200 for clean text readability */
-  font-size: 1.1rem; /* Clearer, larger typography */
+  font-size: 1rem; /* Clearer, larger typography */
   font-weight: 600; /* Bolder font weight for readability */
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -108,8 +108,8 @@
 }
 
 .nav-item svg {
-  width: 22px; /* Larger icons */
-  height: 22px;
+  width: 20px; /* Larger icons */
+  height: 20px;
   flex-shrink: 0;
   opacity: 0.95;
 }
@@ -119,12 +119,12 @@
 }
 
 .nav-item .nav-step {
-  width: 28px; /* Larger steps indicators */
-  height: 28px;
+  width: 26px; /* Larger steps indicators */
+  height: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.95rem; /* Highly legible step numbers */
+  font-size: 0.9rem; /* Highly legible step numbers */
   font-weight: 800;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.15); /* Visible background circle */
@@ -154,8 +154,8 @@
 .main-content {
   flex: 1;
   min-width: 0;
-  margin-left: 290px;
-  padding: var(--space-xl);
+  margin-left: 250px;
+  padding: var(--space-lg);
   min-height: 100vh;
   background: var(--color-bg-primary);
 }

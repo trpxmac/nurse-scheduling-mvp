@@ -437,7 +437,7 @@ a:hover {
 }
 
 .data-table th {
-  padding: 8px 10px;
+  padding: 6px 4px;
   text-align: left;
   font-weight: 600;
   font-size: 0.75rem;
@@ -445,11 +445,12 @@ a:hover {
   letter-spacing: 0.05em;
   color: var(--color-text-secondary);
   border-bottom: 1px solid var(--border-color);
-  white-space: nowrap;
+  white-space: normal;
+  line-height: 1.2;
 }
 
 .data-table td {
-  padding: 8px 10px;
+  padding: 6px 4px;
   border-bottom: 1px solid var(--border-color-light);
   color: var(--color-text-primary);
   vertical-align: middle;
@@ -758,6 +759,7 @@ a:hover {
 /* ---- Roster Grid ---- */
 .roster-grid {
   width: 100%;
+  overflow-x: auto;
 }
 
 .roster-table {
@@ -792,10 +794,10 @@ a:hover {
   background: var(--color-bg-secondary);
   z-index: 5;
   text-align: left;
-  padding-left: 2px;
-  padding-right: 2px;
+  padding-left: 4px;
+  padding-right: 4px;
   font-weight: 600;
-  min-width: 90px;
+  min-width: 80px;
   border-right: 2px solid var(--border-color);
   font-size: 0.7rem;
 }
@@ -804,6 +806,15 @@ a:hover {
   z-index: 15;
 }
 
+.roster-cell-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  text-align: center;
+  text-align-last: center;
+  cursor: pointer;
+  padding: 0;
+}
 
 .shift-none { background: transparent; color: var(--color-text-primary); }
 .shift-M { background: var(--shift-M-bg); color: var(--shift-M-text); }
@@ -1189,3 +1200,17 @@ a:hover {
 .mt-lg { margin-top: var(--space-lg); }
 .mb-md { margin-bottom: var(--space-md); }
 .mb-lg { margin-bottom: var(--space-lg); }
+
+/* ---- Coverage Rows ---- */
+.coverage-row {
+  transition: background-color 0.2s;
+}
+.coverage-row:nth-child(even) td:not(.staff-name-cell):not(.total-cell) {
+  background-color: rgba(0, 0, 0, 0.015);
+}
+.coverage-row:hover td:not(.staff-name-cell):not(.total-cell) {
+  background-color: rgba(59, 130, 246, 0.03);
+}
+.coverage-row td {
+  border-bottom: 1px dashed var(--border-color-light);
+}

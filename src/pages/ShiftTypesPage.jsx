@@ -17,7 +17,7 @@ const CATEGORY_LABELS = {
 
 const EMPTY_FORM = {
   code: '', name: '', start: '07:00', end: '15:00',
-  hours: 8, active: true, category: 'DAY', hex: '#90EE90',
+  hours: 8, active: true, category: 'DAY', hex: '#90EE90', hasTime: true
 };
 
 export default function ShiftTypesPage() {
@@ -83,6 +83,7 @@ export default function ShiftTypesPage() {
       active: st.active,
       category: st.category || 'DAY',
       hex: st.hex || '#90EE90',
+      hasTime: !!(st.start && st.end)
     });
     setEditIndex(index);
     setShowModal(true);
@@ -102,8 +103,6 @@ export default function ShiftTypesPage() {
     return (endMin - startMin) / 60;
   };
 
-  const isNoTimeShift = ['OFF', 'LEAVE'].includes(form.category);
-
   const handleSubmitForm = () => {
     if (!form.code || !form.name) return;
     
@@ -113,13 +112,14 @@ export default function ShiftTypesPage() {
       message: editIndex >= 0 ? 'คุณต้องการบันทึกการแก้ไขประเภทเวรนี้ใช่หรือไม่?' : 'คุณต้องการเพิ่มประเภทเวรใหม่ใช่หรือไม่?',
       danger: false,
       action: () => {
-        const hours = isNoTimeShift ? (Number(form.hours) || 0) : calcHours(form.start, form.end);
+        const hasTime = form.hasTime;
+        const hours = hasTime ? calcHours(form.start, form.end) : (Number(form.hours) || 0);
         const newShift = {
           id: form.code,
           code: form.code,
           name: form.name,
-          start: isNoTimeShift ? '' : form.start,
-          end: isNoTimeShift ? '' : form.end,
+          start: hasTime ? form.start : '',
+          end: hasTime ? form.end : '',
           hours,
           active: form.active,
           category: form.category,
@@ -344,7 +344,19 @@ export default function ShiftTypesPage() {
           />
         </div>
 
-        {!isNoTimeShift ? (
+        <div className="form-group" style={{ marginTop: '16px', marginBottom: '8px' }}>
+          <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+            <input 
+              type="checkbox" 
+              checked={form.hasTime} 
+              onChange={e => handleFormChange('hasTime', e.target.checked)} 
+              style={{ width: '16px', height: '16px', accentColor: 'var(--color-primary)' }}
+            />
+            <span style={{ fontWeight: 600 }}>ระบุเวลาเริ่ม - สิ้นสุด</span>
+          </label>
+        </div>
+
+        {form.hasTime && (
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">เวลาเริ่ม</label>
@@ -365,20 +377,26 @@ export default function ShiftTypesPage() {
               />
             </div>
           </div>
-        ) : (
-          <div className="form-group">
-            <label className="form-label">นับเป็นชั่วโมงทำงาน (ชม.)</label>
-            <input
-              className="form-input"
-              type="number"
-              min="0"
-              max="24"
-              value={form.hours === undefined ? 0 : form.hours}
-              onChange={(e) => handleFormChange('hours', Number(e.target.value))}
-            />
-            <span className="form-hint" style={{ marginTop: 4, display: 'block' }}>เวรที่ไม่กำหนดเวลาเริ่ม-สิ้นสุด สามารถกำหนดจำนวนชั่วโมงที่นับเข้า Roster ได้เอง</span>
-          </div>
         )}
+
+        <div className="form-group">
+          <label className="form-label">นับเป็นชั่วโมงทำงาน (ชม.)</label>
+          <input
+            className="form-input"
+            type="number"
+            min="0"
+            max="24"
+            value={form.hasTime ? calcHours(form.start, form.end) : (form.hours === undefined ? 0 : form.hours)}
+            onChange={(e) => handleFormChange('hours', Number(e.target.value))}
+            disabled={form.hasTime}
+            style={{ backgroundColor: form.hasTime ? 'var(--color-bg-secondary)' : 'white' }}
+          />
+          {form.hasTime ? (
+            <span className="form-hint" style={{ marginTop: 4, display: 'block' }}>ชั่วโมงจะถูกคำนวณอัตโนมัติจากเวลาเริ่มและสิ้นสุด</span>
+          ) : (
+            <span className="form-hint" style={{ marginTop: 4, display: 'block' }}>สามารถกำหนดจำนวนชั่วโมงที่นับเข้า Roster ได้เอง (ใส่ 0 หากไม่ต้องการให้นับ)</span>
+          )}
+        </div>
 
         <div className="form-row">
           <div className="form-group">

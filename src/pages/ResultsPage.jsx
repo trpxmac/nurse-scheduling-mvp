@@ -707,7 +707,7 @@ export default function ResultsPage() {
                     <th key={i}>สัปดาห์ {i + 1}</th>
                   ))}
                   <th>รวม</th>
-                  <th>Quick Returns</th>
+                  <th>สถานะ (Status)</th>
                 </tr>
               </thead>
               <tbody>
@@ -715,24 +715,36 @@ export default function ResultsPage() {
                   <tr key={row.staff.id}>
                     <td style={{ fontWeight: 600 }}>{row.staff.nickname || row.staff.firstName}</td>
                     <td><span className="badge badge-info">{row.staff.position}</span></td>
-                    {row.weeks.map((week, i) => (
-                      <td
-                        key={i}
-                        style={{
-                          fontWeight: 700,
-                          color: week.hours > config.max_weekly_hours ? 'var(--color-danger)' : 'var(--color-text-primary)',
-                          background: week.hours > config.max_weekly_hours ? 'var(--color-danger-bg)' : undefined,
-                        }}
-                      >
-                        {week.hours} ชม.
-                      </td>
-                    ))}
+                    {row.weeks.map((week, i) => {
+                      const isExceed = week.workHours > Number(config.max_weekly_hours || 52);
+                      return (
+                        <td
+                          key={i}
+                          style={{
+                            fontWeight: 700,
+                            color: isExceed ? 'var(--color-danger)' : 'var(--color-text-primary)',
+                            background: isExceed ? 'var(--color-danger-bg)' : undefined,
+                          }}
+                        >
+                          {week.hours} ชม.
+                        </td>
+                      );
+                    })}
                     <td style={{ fontWeight: 700 }}>{row.totalHours} ชม.</td>
                     <td>
-                      {row.quickReturns.length > 0 ? (
-                        <span className="badge badge-danger">
-                          ⚠️ {row.quickReturns.length} ครั้ง
-                        </span>
+                      {row.quickReturns.length > 0 || row.weeks.some(w => w.workHours > Number(config.max_weekly_hours || 52)) ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                          {row.quickReturns.length > 0 && (
+                            <span className="badge badge-danger" style={{ whiteSpace: 'nowrap' }}>
+                              ⚠️ พักไม่พอ ({row.quickReturns.length})
+                            </span>
+                          )}
+                          {row.weeks.some(w => w.workHours > Number(config.max_weekly_hours || 52)) && (
+                            <span className="badge badge-danger" style={{ whiteSpace: 'nowrap' }}>
+                              ⚠️ ชม./สัปดาห์ เกิน
+                            </span>
+                          )}
+                        </div>
                       ) : (
                         <span className="badge badge-success">✅ ปกติ</span>
                       )}
