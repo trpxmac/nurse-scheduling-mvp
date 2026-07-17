@@ -63,11 +63,12 @@ export function checkFeasibility(staffList, shiftTypes, config, lockedSlots = {}
     minStaffPerDay += Number(config[`required_${shift.code}_coverage`]) || 0;
   }
 
-  // 2. Calculate average shift hours
-  let workShifts = activeShifts.filter(s => s.hours > 0);
+  // 2. Calculate average shift hours (LEAVE and OFF categories are excluded from work shifts)
+  const WORK_CATEGORIES = ['DAY', 'NIGHT', 'OTHER'];
+  let workShifts = activeShifts.filter(s => s.hours > 0 && WORK_CATEGORIES.includes(s.category));
   if (config.shift_mode === '8HR') workShifts = workShifts.filter(s => s.hours === 8);
   else if (config.shift_mode === '12HR') workShifts = workShifts.filter(s => s.hours === 12);
-  if (workShifts.length === 0) workShifts = activeShifts.filter(s => s.hours > 0);
+  if (workShifts.length === 0) workShifts = activeShifts.filter(s => s.hours > 0 && WORK_CATEGORIES.includes(s.category));
 
   const avgShiftHours = workShifts.length > 0
     ? workShifts.reduce((sum, s) => sum + s.hours, 0) / workShifts.length
@@ -145,15 +146,17 @@ export function generateAIRoster(staffList, shiftTypes, config, lockedSlots = {}
   const daysInMonth = new Date(year, month, 0).getDate();
 
   // Determine which shifts to use based on shift_mode
-  // AI should only automatically generate working shifts (hours > 0)
-  let workShifts = activeShifts.filter(s => s.hours > 0);
+  // AI should only automatically generate working shifts (hours > 0) that are NOT LEAVE or OFF.
+  // LEAVE categories (SL, AL, ML, etc.) and OFF categories are managed manually, not auto-generated.
+  const WORK_CATEGORIES = ['DAY', 'NIGHT', 'OTHER'];
+  let workShifts = activeShifts.filter(s => s.hours > 0 && WORK_CATEGORIES.includes(s.category));
   if (config.shift_mode === '8HR') {
     workShifts = workShifts.filter(s => s.hours === 8);
   } else if (config.shift_mode === '12HR') {
     workShifts = workShifts.filter(s => s.hours === 12);
   }
 
-  if (workShifts.length === 0) workShifts = activeShifts.filter(s => s.hours > 0);
+  if (workShifts.length === 0) workShifts = activeShifts.filter(s => s.hours > 0 && WORK_CATEGORIES.includes(s.category));
 
   // Sort workShifts by COVERAGE RATIO PRIORITY, not hours.
   // We want the shifts that are most "behind" relative to their requirement to be filled first.

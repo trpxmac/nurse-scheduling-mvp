@@ -1,9 +1,9 @@
 /* ============================================
-   Print Page Styles
+   Print Page Styles — Clean & Simple
    ============================================ */
 
 body {
-  background-color: #f3f4f6; /* Light gray background for preview mode */
+  background-color: #f3f4f6;
 }
 
 .print-preview-wrapper {
@@ -17,19 +17,16 @@ body {
   background: white;
   color: black;
   font-family: 'Sarabun', 'Inter', sans-serif;
-  padding: 40px;
-  width: max-content; /* Allow container to grow with the table */
-  min-width: 297mm; /* Minimum A4 Landscape width */
-  min-height: 210mm; /* A4 Landscape height */
+  padding: 16px 20px;
+  width: max-content;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
   border-radius: 4px;
 }
 
+/* ── Fixed top bar (screen only) ── */
 .print-header-bar {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
+  top: 0; left: 0; right: 0;
   height: 60px;
   background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(12px);
@@ -57,120 +54,81 @@ body {
   gap: 16px;
 }
 
+/* ── Document header ── */
 .print-header {
   display: flex;
   align-items: flex-start;
-  margin-bottom: 16px;
-  position: relative;
+  margin-bottom: 6px;
 }
 
-.print-logo-container {
-  width: 150px;
-}
-
-.print-logo {
-  max-width: 100%;
-  height: auto;
-}
+.print-logo-container { width: 100px; }
+.print-logo { max-width: 100%; height: auto; }
 
 .print-title-container {
   flex: 1;
   text-align: center;
-  padding-top: 10px;
+  padding-top: 4px;
 }
 
 .print-title-container h2 {
-  font-size: 16px;
+  font-size: 13px;
   font-weight: bold;
-  margin: 0 0 8px 0;
+  margin: 0 0 3px 0;
 }
 
-.print-subtitle {
-  font-size: 12px;
-}
+.print-subtitle { font-size: 10px; }
 
-/* Table Styles */
+/* ── Table ── */
 .print-table {
-  width: 100%;
+  width: auto;
   border-collapse: collapse;
-  font-size: 10px;
-  margin-bottom: 20px;
+  font-size: 9px;
+  margin-bottom: 4px;
 }
 
 .print-table th,
 .print-table td {
   border: 1px solid #000;
-  padding: 4px;
+  padding: 2px 3px;
   vertical-align: middle;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .print-table th {
   background-color: #f3f4f6;
   font-weight: bold;
-  text-align: center;
 }
 
-.col-no { width: 30px; }
-.col-empid { width: 60px; }
-.col-name { width: 140px; text-align: left !important; padding-left: 8px !important; }
-.col-position { width: 60px; }
-.col-day-label { width: 30px; }
-.col-day-num, .col-dow { width: 22px; padding: 2px !important; }
-.col-summary { width: 60px; }
-.col-remark { width: 80px; }
-
-.staff-name-cell {
-  text-align: left;
-  padding-left: 8px;
+.col-name {
+  text-align: left !important;
+  padding-left: 8px !important;
 }
 
-.row-label {
-  font-weight: bold;
-  background-color: #f9fafb;
+.col-day-num, .col-dow {
+  padding: 2px 2px !important;
 }
 
-.cell-shift {
-  font-weight: bold;
-}
+.staff-name-cell { text-align: left; padding-left: 8px; }
+.row-label { font-weight: bold; background-color: #f9fafb; }
+.cell-shift { font-weight: bold; }
+.cell-ot { color: #4b5563; font-size: 9px; }
+.summary-val { font-weight: bold; }
 
-.cell-ot {
-  color: #4b5563;
-  font-size: 9px;
-}
-
-.summary-val {
-  font-weight: bold;
-}
-
-/* Footer / Legend */
+/* ── Signature Footer ── */
 .print-footer {
   display: flex;
   justify-content: space-between;
-  margin-top: 20px;
-  font-size: 10px;
-}
-
-.legend-section {
-  width: 40%;
-}
-
-.legend-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 4px;
-}
-
-.legend-item {
-  border: 1px solid #e5e7eb;
-  padding: 4px 8px;
-  background: #f9fafb;
+  margin-top: 16px;
+  font-size: 9px;
 }
 
 .signature-section {
   display: flex;
-  gap: 40px;
-  width: 60%;
+  gap: 60px;
+  width: 100%;
   justify-content: flex-end;
+  padding-right: 20px;
 }
 
 .sig-box {
@@ -184,45 +142,48 @@ body {
 .sig-line {
   border-bottom: 1px dotted #000;
   width: 140px;
-  margin-bottom: 6px;
-}
-
-.sig-name {
   margin-bottom: 4px;
+  margin-top: 36px;
 }
 
-.sig-title {
-  font-weight: bold;
-}
+.sig-name { margin-bottom: 4px; }
+.sig-title { font-weight: bold; }
 
-/* Print Specific Rules */
+/* ============================================
+   Print — Let browser handle scaling via
+   "Fit to page" in print dialog
+   ============================================ */
 @media print {
   @page {
     size: A4 landscape;
-    margin: 10mm;
+    margin: 0; /* Removing page margins hides the browser's default date/URL/page number */
   }
 
-  body * {
-    visibility: hidden;
-  }
+  body * { visibility: hidden; }
 
-  .print-page-container, .print-page-container * {
-    visibility: visible;
+  /* Make wrapper and container visible to keep flex centering */
+  .print-preview-wrapper,
+  .print-page-container,
+  .print-page-container * { visibility: visible; }
+
+  .print-preview-wrapper {
+    padding: 20px; /* Provide padding since page margin is 0 */
+    margin: 0;
+    min-height: auto;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
   }
 
   .print-page-container {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    min-width: auto;
+    position: relative;
+    width: max-content;
+    margin: 0 auto;
     padding: 0;
     box-shadow: none;
   }
 
-  .no-print {
-    display: none !important;
-  }
+  .no-print { display: none !important; }
 
   .print-table th {
     background-color: #f3f4f6 !important;
@@ -236,3 +197,4 @@ body {
     print-color-adjust: exact;
   }
 }
+

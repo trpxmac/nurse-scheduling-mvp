@@ -16,6 +16,9 @@ import {
   detectConsecutiveNights, detectConsecutiveWorkdays, detectMaxDailyHours
 } from '../utils/scheduling';
 
+// LEVEL_RANK for required_level_every_shift comparison (outside component to avoid re-creation)
+const LEVEL_RANK = { HOD: 6, RN5: 5, RN4: 4, RN3: 3, RN2: 2, RN1: 1, PN: 0, PA: 0, NA: 0, '-': 0 };
+
 export default function MonthlyRosterPage() {
   const [config, setConfig] = useState({});
   const [shiftTypes, setShiftTypes] = useState([]);
@@ -84,6 +87,39 @@ export default function MonthlyRosterPage() {
     return map;
   }, [leaveSchedules]);
 
+  // LEVEL_RANK for required_level_every_shift comparison
+
+  // Pre-compute: for each day, which shift codes are missing the required level
+  const missingLevelDays = useMemo(() => {
+    const reqLevel = config.required_level_every_shift;
+    if (!reqLevel) return {}; // No constraint set
+    const reqRank = LEVEL_RANK[reqLevel] || 0;
+
+    // result: { [day]: Set<shiftCode> } — shift codes that are missing required level on that day
+    const result = {};
+    const daysArr = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+    for (const day of daysArr) {
+      // Collect all (staffId, shiftCode) pairs working on this day
+      const shiftGroups = {}; // shiftCode -> array of staff
+      for (const staff of activeStaff) {
+        const { shift } = parseShift((roster[staff.id] || {})[day]);
+        if (!shift || shift === '' || shift === '-') continue;
+        const st = shiftTypesMap[shift];
+        if (!st || st.category === 'OFF' || st.category === 'LEAVE') continue;
+        if (!shiftGroups[shift]) shiftGroups[shift] = [];
+        shiftGroups[shift].push(staff);
+      }
+      // Check each shift group for qualified staff
+      const missingShifts = new Set();
+      for (const [shiftCode, staffGroup] of Object.entries(shiftGroups)) {
+        const hasQualified = staffGroup.some(s => (LEVEL_RANK[s.level || '-'] || 0) >= reqRank);
+        if (!hasQualified) missingShifts.add(shiftCode);
+      }
+      if (missingShifts.size > 0) result[day] = missingShifts;
+    }
+    return result;
+  }, [roster, activeStaff, shiftTypesMap, config, daysInMonth]);
+
   // Calculate violations for each staff with details for tooltip
   const violations = useMemo(() => {
     const v = {};
@@ -127,9 +163,21 @@ export default function MonthlyRosterPage() {
       for (const viol of dailyHours) {
         addViolation(viol.day, `⚠️ ทำงานเกิน ${maxDaily} ชม. ในหนึ่งวัน (ทำจริง ${viol.hours} ชม.)`);
       }
+
+      // Required Level Every Shift
+      if (config.required_level_every_shift) {
+        const reqLevel = config.required_level_every_shift;
+        for (const day of Object.keys(missingLevelDays).map(Number)) {
+          const missingShifts = missingLevelDays[day];
+          const { shift } = parseShift(sr[day]);
+          if (shift && missingShifts.has(shift)) {
+            addViolation(day, `🚨 เวร ${shift} วันที่ ${day} ไม่มีพยาบาลระดับ ${reqLevel} ขึ้นไป`);
+          }
+        }
+      }
     }
     return v;
-  }, [roster, activeStaff, shiftTypesMap, config, viewMonth]);
+  }, [roster, activeStaff, shiftTypesMap, config, viewMonth, missingLevelDays]);
 
   // Per-staff comprehensive validation (real-time)
   const staffValidations = useMemo(() => {
@@ -163,10 +211,20 @@ export default function MonthlyRosterPage() {
       const dailyHours = detectMaxDailyHours(sr, shiftTypesMap, maxDaily);
       if (dailyHours.length > 0) issues.push(`วันเกิน (${dailyHours.length} ครั้ง)`);
 
+      // Required Level Every Shift — count days this staff is in a shift missing the required level
+      if (config.required_level_every_shift) {
+        let levelViolDays = 0;
+        for (const day of Object.keys(missingLevelDays).map(Number)) {
+          const { shift } = parseShift(sr[day]);
+          if (shift && missingLevelDays[day]?.has(shift)) levelViolDays++;
+        }
+        if (levelViolDays > 0) issues.push(`ขาดระดับ ${config.required_level_every_shift} (${levelViolDays} วัน)`);
+      }
+
       result[staff.id] = issues;
     }
     return result;
-  }, [roster, activeStaff, shiftTypesMap, config, viewMonth]);
+  }, [roster, activeStaff, shiftTypesMap, config, viewMonth, missingLevelDays]);
 
   // Daily coverage
   const coverage = useMemo(() => {
@@ -343,21 +401,34 @@ export default function MonthlyRosterPage() {
             <thead>
               <tr>
                 <th className="staff-name-cell">ชื่อ</th>
-                {days.map(d => (
-                  <th
-                    key={d}
-                    style={{
-                      background: isWeekend(viewMonth, d) ? '#fef3c7' : undefined,
-                      minWidth: 24,
-                      padding: '0 2px',
-                    }}
-                  >
-                    <div>{d}</div>
-                    <div style={{ fontSize: '0.6rem', color: isWeekend(viewMonth, d) ? 'var(--color-accent)' : 'var(--color-text-muted)' }}>
-                      {getDayOfWeek(viewMonth, d)}
-                    </div>
-                  </th>
-                ))}
+                {days.map(d => {
+                  const hasMissingLevel = config.required_level_every_shift && missingLevelDays[d]?.size > 0;
+                  const missingShiftList = hasMissingLevel ? Array.from(missingLevelDays[d]).join(', ') : '';
+                  return (
+                    <th
+                      key={d}
+                      style={{
+                        background: hasMissingLevel
+                          ? 'rgba(239,68,68,0.10)'
+                          : isWeekend(viewMonth, d) ? '#fef3c7' : undefined,
+                        minWidth: 24,
+                        padding: '0 2px',
+                        position: 'relative',
+                      }}
+                      title={hasMissingLevel ? `🚨 เวร ${missingShiftList} ขาดระดับ ${config.required_level_every_shift}` : undefined}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px' }}>
+                        {d}
+                        {hasMissingLevel && (
+                          <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--color-danger)', display: 'inline-block', flexShrink: 0 }} />
+                        )}
+                      </div>
+                      <div style={{ fontSize: '0.6rem', color: hasMissingLevel ? 'var(--color-danger)' : isWeekend(viewMonth, d) ? 'var(--color-accent)' : 'var(--color-text-muted)' }}>
+                        {getDayOfWeek(viewMonth, d)}
+                      </div>
+                    </th>
+                  );
+                })}
                 <th className="total-cell" style={{ minWidth: 40, borderLeft: '1px solid var(--border-color)' }}>ชม.เวร</th>
                 <th className="total-cell" style={{ minWidth: 40, color: '#9ca3af' }}>OT</th>
               </tr>

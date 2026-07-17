@@ -16,9 +16,40 @@ export default function PrintPage() {
   const [monthlySettings, setMonthlySettings] = useState({});
 
   useEffect(() => {
-    // Add gray body background class on mount, remove on unmount
     document.body.style.backgroundColor = '#f3f4f6';
     return () => { document.body.style.backgroundColor = ''; }
+  }, []);
+
+  // Auto-scale to fit one A4 landscape page
+  useEffect(() => {
+    const handleBeforePrint = () => {
+      const el = document.querySelector('.print-page-container');
+      if (!el) return;
+      // Reset first to measure natural size
+      el.style.transform = '';
+      el.style.zoom = '';
+      el.style.transformOrigin = 'top left';
+      // A4 landscape printable area: 277mm × 190mm (with 10mm margins)
+      const pageW = 277 * 3.78;  // ~1047px
+      const pageH = 190 * 3.78;  // ~718px
+      const scale = Math.min(pageW / el.scrollWidth, pageH / el.scrollHeight, 1);
+      if (scale < 1) {
+        el.style.zoom = scale; // Using zoom shrinks the layout space, preventing extra blank pages in Chrome/Edge
+      }
+    };
+    const handleAfterPrint = () => {
+      const el = document.querySelector('.print-page-container');
+      if (el) {
+        el.style.transform = '';
+        el.style.zoom = '';
+      }
+    };
+    window.addEventListener('beforeprint', handleBeforePrint);
+    window.addEventListener('afterprint', handleAfterPrint);
+    return () => {
+      window.removeEventListener('beforeprint', handleBeforePrint);
+      window.removeEventListener('afterprint', handleAfterPrint);
+    };
   }, []);
 
   useEffect(() => {
@@ -65,7 +96,7 @@ export default function PrintPage() {
         </div>
         <div className="print-header-actions">
           <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>
-            * แนะนำให้ตั้งค่าเป็น <strong>Landscape (แนวนอน)</strong> และ <strong>A4</strong>
+            * แนะนำ: <strong>Landscape (แนวนอน)</strong> · <strong>A4</strong> · Scale: <strong>Fit to page</strong>
           </p>
           <button className="btn btn-primary" onClick={() => window.print()} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <Printer size={16} /> สั่งพิมพ์ (Print)
